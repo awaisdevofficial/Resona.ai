@@ -217,10 +217,7 @@ export function TestCallPanel({
         if (state === ConnectionState.Connected) {
           setCallState("connected")
         }
-        if (
-          state === ConnectionState.Disconnected ||
-          state === ConnectionState.Failed
-        ) {
+        if (state === ConnectionState.Disconnected) {
           setCallState("ended")
           completeCallOnServer()
           cleanupRoom()
@@ -294,23 +291,23 @@ export function TestCallPanel({
 
       <div
         className={cn(
-          "fixed top-0 right-0 h-full w-[420px] bg-surface border-l border-border shadow-2xl z-50",
+          "fixed top-0 right-0 h-full w-full max-w-[420px] bg-surface border-l border-border shadow-modal z-50",
           "flex flex-col transition-transform duration-300 ease-in-out",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-primary tracking-tight">
+            <h2 className="text-section-title text-text-primary tracking-tight">
               Test Agent
             </h2>
-            <p className="text-xs text-muted mt-0.5">{agentName}</p>
+            <p className="text-label text-text-muted mt-0.5">{agentName}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-gray-100 text-[#9CA3AF]"
+            className="p-2 rounded-button hover:bg-background text-text-muted transition-colors"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
@@ -321,10 +318,10 @@ export function TestCallPanel({
                 <Phone size={20} className="text-brand" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-primary">
+                <p className="text-body font-semibold text-text-primary">
                   Ready to test
                 </p>
-                <p className="text-xs text-muted mt-1 max-w-[260px] leading-relaxed">
+                <p className="text-label text-text-muted mt-1 max-w-[260px] leading-relaxed">
                   Click Start Call to connect your browser directly to this
                   agent. The transcript will appear here in real time.
                 </p>
@@ -335,7 +332,7 @@ export function TestCallPanel({
           {callState === "connecting" && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <Loader2 size={24} className="text-brand animate-spin" />
-              <p className="text-sm text-muted">Connecting to agent...</p>
+              <p className="text-body text-text-muted">Connecting to agent...</p>
             </div>
           )}
 
@@ -356,7 +353,7 @@ export function TestCallPanel({
                 className={cn(
                   "max-w-[300px] px-3 py-2 rounded-xl text-xs leading-relaxed",
                   line.role === "agent"
-                    ? "bg-gray-100 text-primary rounded-tl-none"
+                    ? "bg-background text-text-primary rounded-tl-none border border-border"
                     : "bg-brand text-white rounded-tr-none"
                 )}
               >
@@ -367,7 +364,7 @@ export function TestCallPanel({
 
           {callState === "ended" && transcript.length > 0 && (
             <div className="text-center py-3">
-              <span className="text-xs text-muted bg-gray-50 px-3 py-1 rounded-full border border-border font-medium">
+              <span className="text-label text-text-muted bg-background px-3 py-1 rounded-badge border border-border font-medium">
                 Call ended — {formatDuration(duration)}
               </span>
             </div>
@@ -377,7 +374,7 @@ export function TestCallPanel({
         </div>
 
         {error && (
-          <div className="mx-5 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="mx-5 mb-3 rounded-input border border-error/30 bg-red-50 px-3 py-2 text-label text-error">
             {error}
           </div>
         )}
@@ -392,14 +389,14 @@ export function TestCallPanel({
                     setTranscript([])
                     setError(null)
                   }}
-                  className="w-full px-4 py-2 border border-border text-sm font-medium text-[#111122] rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full px-4 py-2 border border-border text-body font-medium text-text-primary rounded-button hover:bg-background transition-colors"
                 >
                   Clear and reset
                 </button>
               )}
               <button
                 onClick={startCall}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand text-white text-body font-medium rounded-button hover:bg-brand-dark transition-all duration-150 active:scale-95"
               >
                 <Phone size={15} />
                 {callState === "ended" ? "Call again" : "Start Call"}
@@ -412,8 +409,8 @@ export function TestCallPanel({
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors border",
                   muted
-                    ? "bg-amber-50 border-amber-200 text-amber-700"
-                    : "bg-gray-50 border-border text-[#111122] hover:bg-gray-100"
+                    ? "bg-amber-50 border-amber-200 text-warning"
+                    : "bg-background border-border text-text-primary hover:bg-background/80"
                 )}
               >
                 {muted ? <MicOff size={15} /> : <Mic size={15} />}
@@ -436,7 +433,7 @@ export function TestCallPanel({
             </div>
           )}
 
-          <p className="text-xs text-muted text-center mt-3">
+          <p className="text-label text-text-muted text-center mt-3">
             This is a browser-based test call. No phone or Twilio is used.
           </p>
         </div>

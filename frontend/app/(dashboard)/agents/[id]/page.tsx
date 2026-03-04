@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
-import { ArrowLeft, Play, Loader2, Phone, Save } from "lucide-react"
+import { ArrowLeft, BookOpen, Play, Loader2, Phone, Save, Settings, Trash2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -60,6 +60,7 @@ interface AgentFormValues {
   silence_timeout: number
   max_duration: number
   agent_speaks_first: boolean
+  transfer_number: string
 }
 
 export default function AgentEditPage({
@@ -71,6 +72,7 @@ export default function AgentEditPage({
   const queryClient = useQueryClient()
   const [testPanelOpen, setTestPanelOpen] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<"config" | "knowledge">("config")
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const { data: agent, isLoading } = useQuery({
@@ -88,6 +90,7 @@ export default function AgentEditPage({
       silence_timeout: 30,
       max_duration: 3600,
       agent_speaks_first: true,
+      transfer_number: "",
     },
   })
 
@@ -102,6 +105,7 @@ export default function AgentEditPage({
         silence_timeout: agent.silence_timeout || 30,
         max_duration: agent.max_duration || 3600,
         agent_speaks_first: agent.tools_config?.agent_speaks_first ?? true,
+        transfer_number: agent.tools_config?.transfer_number ?? "",
       })
     }
   }, [agent])
@@ -118,7 +122,10 @@ export default function AgentEditPage({
       api.patch(`/v1/agents/${params.id}`, {
         ...FIXED_DEFAULTS,
         ...values,
-        tools_config: { agent_speaks_first: values.agent_speaks_first },
+        tools_config: {
+          agent_speaks_first: values.agent_speaks_first,
+          transfer_number: values.transfer_number || undefined,
+        },
       }),
     onSuccess: (updatedAgent: any) => {
       toast.success("Agent saved")
@@ -132,6 +139,7 @@ export default function AgentEditPage({
         max_duration: updatedAgent.max_duration || 3600,
         agent_speaks_first:
           updatedAgent.tools_config?.agent_speaks_first ?? true,
+        transfer_number: updatedAgent.tools_config?.transfer_number ?? "",
       })
       queryClient.invalidateQueries({ queryKey: ["agents"] })
       queryClient.invalidateQueries({ queryKey: ["agent", params.id] })
@@ -244,7 +252,39 @@ export default function AgentEditPage({
           }
         />
 
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)] gap-6 items-start">
+        <div className="mt-4 flex gap-2 border-b border-border mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab("config")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
+              activeTab === "config"
+                ? "border-brand text-brand bg-brand/5"
+                : "border-transparent text-muted hover:text-primary hover:bg-canvas/50"
+            )}
+          >
+            <Settings size={16} />
+            Configuration
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("knowledge")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
+              activeTab === "knowledge"
+                ? "border-brand text-brand bg-brand/5"
+                : "border-transparent text-muted hover:text-primary hover:bg-canvas/50"
+            )}
+          >
+            <BookOpen size={16} />
+            Knowledge Base
+          </button>
+        </div>
+
+        {activeTab === "knowledge" ? (
+          <KnowledgeBaseTab agentId={params.id} />
+        ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)] gap-6 items-start">
           <form className="space-y-6 bg-surface border border-border rounded-xl shadow-card p-6">
             <section className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -412,6 +452,26 @@ export default function AgentEditPage({
                   </div>
                 </div>
               </div>
+
+              <section className="space-y-4 pt-4 border-t border-border">
+                <h2 className="text-sm font-semibold text-[#111122]">Call Transfer</h2>
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-[#4B5563]">
+                    Transfer to number{" "}
+                    <span className="text-[#9CA3AF] font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    {...form.register("transfer_number")}
+                    placeholder="+1234567890"
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+                  />
+                  <p className="text-[11px] text-[#9CA3AF]">
+                    When the caller asks to speak to a human, the agent will transfer to
+                    this number.
+                  </p>
+                </div>
+              </section>
             </section>
 
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
@@ -516,6 +576,7 @@ export default function AgentEditPage({
             </div>
           </aside>
         </div>
+        )}
       </div>
 
       <TestCallPanel
@@ -525,5 +586,135 @@ export default function AgentEditPage({
         onClose={() => setTestPanelOpen(false)}
       />
     </>
+  )
+}
+
+function KnowledgeBaseTab({ agentId }: { agentId: string }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState("")
+  const [content, setContent] = useState("")
+
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ["knowledge-base", agentId],
+    queryFn: () =>
+      api.get(`/v1/knowledge-base/agent/${agentId}`) as Promise<
+        { id: string; name: string; content: string }[]
+      >,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (body: { name: string; content: string; agent_id: string }) =>
+      api.post("/v1/knowledge-base", body),
+    onSuccess: () => {
+      toast.success("Knowledge added")
+      setName("")
+      setContent("")
+      qc.invalidateQueries({ queryKey: ["knowledge-base", agentId] })
+    },
+    onError: () => toast.error("Failed to add knowledge"),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/v1/knowledge-base/${id}`),
+    onSuccess: () => {
+      toast.success("Deleted")
+      qc.invalidateQueries({ queryKey: ["knowledge-base", agentId] })
+    },
+    onError: () => toast.error("Failed to delete"),
+  })
+
+  const handleAdd = () => {
+    if (!name.trim() || !content.trim()) {
+      toast.error("Name and content are required")
+      return
+    }
+    createMutation.mutate({
+      name: name.trim(),
+      content: content.trim(),
+      agent_id: agentId,
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-surface border border-border rounded-xl shadow-card p-6">
+        <h2 className="text-sm font-semibold text-[#111122] mb-4">
+          Add Knowledge
+        </h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-[#4B5563] mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Product FAQ, Company Info"
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#4B5563] mb-1">
+              Content
+            </label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Paste text directly..."
+              rows={6}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60 resize-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={createMutation.isPending || !name.trim() || !content.trim()}
+            className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50"
+          >
+            {createMutation.isPending ? "Adding..." : "Add"}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl shadow-card p-6">
+        <h2 className="text-sm font-semibold text-[#111122] mb-4">
+          Existing entries
+        </h2>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <Loader2 size={16} className="animate-spin" />
+            Loading...
+          </div>
+        ) : !entries.length ? (
+          <p className="text-sm text-muted">No knowledge base entries yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {entries.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex items-start justify-between gap-4 rounded-lg border border-border p-3 bg-canvas/30"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-primary">{entry.name}</p>
+                  <p className="text-xs text-muted mt-0.5 line-clamp-2">
+                    {entry.content}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Delete this entry?")) deleteMutation.mutate(entry.id)
+                  }}
+                  className="p-1.5 rounded-lg text-muted hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   )
 }

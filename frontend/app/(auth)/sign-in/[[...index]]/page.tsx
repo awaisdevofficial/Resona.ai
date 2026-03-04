@@ -29,18 +29,18 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas px-4 font-sans">
-      <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-card p-8 space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 font-sans">
+      <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-modal p-8 space-y-6">
         <div>
-          <h1 className="text-xl font-semibold text-primary">Sign in</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="text-page-title text-text-primary">Sign in</h1>
+          <p className="mt-1 text-body text-text-secondary">
             Sign in with your email and password.
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[#4B5563]">
+            <label className="block text-label text-text-secondary">
               Email
             </label>
             <input
@@ -48,12 +48,12 @@ export default function SignInPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+              className="w-full rounded-input border border-border bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[#4B5563]">
+            <label className="block text-label text-text-secondary">
               Password
             </label>
             <input
@@ -61,12 +61,12 @@ export default function SignInPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+              className="w-full rounded-input border border-border bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+            <p className="text-label text-error bg-red-50 border border-red-200 rounded-input px-3 py-2">
               {error}
             </p>
           )}
@@ -74,13 +74,13 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark transition-colors disabled:opacity-60"
+            className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-button bg-brand text-white text-body font-semibold hover:bg-brand-dark transition-all duration-150 disabled:opacity-60"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="text-xs text-muted text-center">
+        <p className="text-label text-text-muted text-center">
           Don&apos;t have an account?{" "}
           <Link href="/sign-up" className="text-brand hover:underline">
             Sign up

@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
@@ -53,9 +54,11 @@ class Call(Base):
     duration_seconds = Column(Integer, nullable=True)
     # [{role: "user"|"assistant", text: "...", timestamp: "ISO8601"}]
     transcript = Column(JSONB, default=list)
+    summary = Column(Text, nullable=True)
     recording_url = Column(String, nullable=True)
     end_reason = Column(String, nullable=True)
     cost_cents = Column(Integer, default=0)
+    analysis = Column(JSONB, nullable=True)
     # Use a non-reserved attribute name but keep the DB column name as "metadata"
     metadata_json = Column("metadata", JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)

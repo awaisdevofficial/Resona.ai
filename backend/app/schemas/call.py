@@ -26,9 +26,12 @@ class CallResponse(BaseModel):
     ended_at: Optional[datetime]
     duration_seconds: Optional[int]
     transcript: list
+    summary: Optional[str] = None
     end_reason: Optional[str]
+    recording_url: Optional[str] = None
     cost_cents: int
     metadata: dict = Field(validation_alias="metadata_json")
+    analysis: dict | None = None
     created_at: datetime
 
 
@@ -36,6 +39,11 @@ class TranscriptTurn(BaseModel):
     role: str  # "user" or "assistant"
     text: str
     timestamp: str
+
+
+class TranscriptBatch(BaseModel):
+    lines: list[TranscriptTurn]
+    duration_seconds: int
 
 
 class CallCompleteRequest(BaseModel):

@@ -25,7 +25,7 @@ async def initiate_outbound_call(agent, user, to_number: str, call_id: str) -> s
         to=to_number,
         from_=from_number,
         twiml=twiml,
-        status_callback=f"{settings.API_BASE_URL}/twilio/outbound-status",
+        status_callback=f"{settings.API_BASE_URL}/twilio/status",
         status_callback_method="POST",
     )
     return call.sid

@@ -1,4 +1,4 @@
-import type { Config } from "tailwindcss"
+import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
@@ -6,35 +6,63 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: { DEFAULT: "#6C63FF", light: "#EEEDFF", dark: "#4F46D8" },
-        canvas: "#FAFAFA",
-        sidebar: "#0F0F17",
-        border: "#E8E8F0",
+        brand: {
+          DEFAULT: "#6C63FF",
+          dark: "#4F46E5",
+          light: "#EEEDFF",
+        },
+        background: "#F8F8FC",
         surface: "#FFFFFF",
-        primary: "#111122",
-        muted: "#6B7280"
+        sidebar: "#0F0F1A",
+        border: "#E5E4F0",
+        text: {
+          primary: "#111122",
+          secondary: "#6B7280",
+          muted: "#9CA3AF",
+        },
+        "text-primary": "#111122",
+        "text-secondary": "#6B7280",
+        "text-muted": "#9CA3AF",
+        success: "#10B981",
+        warning: "#F59E0B",
+        error: "#EF4444",
+        info: "#3B82F6",
       },
       fontFamily: {
-        sans: ["Manrope", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"]
+        sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      fontSize: {
+        "page-title": ["24px", { lineHeight: "1.25", fontWeight: "600" }],
+        "section-title": ["16px", { lineHeight: "1.5", fontWeight: "600" }],
+        body: ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+        label: ["12px", { lineHeight: "1.4", fontWeight: "500" }],
+        "stat-number": ["28px", { lineHeight: "1.2", fontWeight: "700" }],
       },
       boxShadow: {
-        sm: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-        md: "0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
-        lg: "0 10px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)",
-        card: "0 1px 3px rgba(0,0,0,0.04)"
+        card: "0 1px 4px rgba(0,0,0,0.06)",
+        dropdown: "0 8px 24px rgba(0,0,0,0.12)",
+        modal: "0 24px 64px rgba(0,0,0,0.18)",
       },
       borderRadius: {
-        DEFAULT: "12px",
-        sm: "8px",
-        lg: "14px",
-        xl: "18px",
-        "2xl": "20px"
-      }
-    }
+        card: "12px",
+        button: "8px",
+        input: "8px",
+        badge: "6px",
+      },
+      maxWidth: {
+        content: "1200px",
+      },
+      width: {
+        sidebar: "240px",
+        "sidebar-collapsed": "72px",
+      },
+      spacing: {
+        "page-padding": "32px",
+      },
+    },
   },
-  plugins: [require("@tailwindcss/typography")]
-}
+  plugins: [require("@tailwindcss/typography")],
+};
 
-export default config
-
+export default config;

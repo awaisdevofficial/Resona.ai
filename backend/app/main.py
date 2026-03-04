@@ -10,6 +10,7 @@ from app.routers import (
     api_keys,
     analytics,
     calls,
+    knowledge_base,
     phone_numbers,
     settings as settings_router,
     twilio_webhook,
@@ -67,6 +68,11 @@ app.include_router(twilio_webhook.router, prefix="/twilio", tags=["Twilio"])
 app.include_router(analytics.router, prefix="/v1/analytics", tags=["Analytics"])
 app.include_router(api_keys.router, prefix="/v1/api-keys", tags=["API Keys"])
 app.include_router(webhooks.router, prefix="/v1/webhooks", tags=["Webhooks"])
+app.include_router(
+    knowledge_base.router,
+    prefix="/v1/knowledge-base",
+    tags=["Knowledge Base"],
+)
 
 
 @app.get("/health")

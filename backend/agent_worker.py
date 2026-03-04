@@ -3,10 +3,11 @@ import asyncio
 import json
 import logging
 import os
+import time
+from datetime import datetime
+
 from dotenv import load_dotenv
-
-load_dotenv()
-
+import httpx
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
@@ -14,12 +15,30 @@ from livekit.agents import (
     WorkerOptions,
     cli,
 )
+from livekit.agents.llm import function_tool
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
 from livekit.plugins import deepgram, elevenlabs, silero, groq
 
+load_dotenv()
+
 logger = logging.getLogger("resona-agent")
 logging.basicConfig(level=logging.INFO)
+
+
+async def end_call(call_id: str, transcript_lines: list, duration: int):
+    if not call_id:
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{os.environ.get('API_BASE_URL', 'http://localhost:8000')}/internal/calls/{call_id}/transcript",
+                json={"lines": transcript_lines, "duration_seconds": duration},
+                headers={"X-Internal-Secret": os.environ.get("INTERNAL_SECRET", "")},
+                timeout=10,
+            )
+    except Exception as e:
+        logger.warning(f"Failed to save transcript: {e}")
 
 
 def prewarm(proc: JobProcess):
@@ -31,7 +50,7 @@ async def entrypoint(ctx: JobContext):
 
     participant = await ctx.wait_for_participant()
 
-    agent_config = {}
+    agent_config: dict = {}
     try:
         metadata = ctx.room.metadata
         if metadata:
@@ -43,6 +62,14 @@ async def entrypoint(ctx: JobContext):
         "system_prompt",
         "You are a helpful, friendly voice AI assistant. Keep responses short and conversational.",
     )
+    kb_content = agent_config.get("knowledge_base", "")
+    if kb_content:
+        system_prompt = (
+            system_prompt
+            + "\n\n=== KNOWLEDGE BASE ===\n"
+            + kb_content
+            + "\n=== END KNOWLEDGE BASE ==="
+        )
     first_message = agent_config.get("first_message", "Hi, how can I help you today?")
     VOICE_NAME_TO_ID = {
         "Rachel": "21m00Tcm4TlvDq8ikWAM",
@@ -74,6 +101,10 @@ async def entrypoint(ctx: JobContext):
     voice_name = agent_config.get("tts_voice_id", "Josh")
     voice_id = VOICE_NAME_TO_ID.get(voice_name, "TxGEqnHWrfWFTfGW9XjX")
 
+    # Track transcript lines and call duration
+    transcript_lines: list[dict] = []
+    start_time = time.time()
+
     async def send_transcript(role: str, text: str):
         try:
             payload = json.dumps({"type": "transcript", "role": role, "text": text})
@@ -102,17 +133,63 @@ async def entrypoint(ctx: JobContext):
     @session.on("user_input_transcribed")
     def on_user_transcript(event: UserInputTranscribedEvent):
         if event.is_final and event.transcript.strip():
-            logger.info(f"User: {event.transcript}")
-            asyncio.ensure_future(send_transcript("user", event.transcript))
+            text = event.transcript.strip()
+            logger.info(f"User: {text}")
+            transcript_lines.append(
+                {
+                    "role": "user",
+                    "text": text,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+            asyncio.ensure_future(send_transcript("user", text))
 
     @session.on("agent_speech_committed")
     def on_agent_speech(text: str):
         if text and text.strip():
-            logger.info(f"Agent: {text}")
-            asyncio.ensure_future(send_transcript("agent", text))
+            cleaned = text.strip()
+            logger.info(f"Agent: {cleaned}")
+            transcript_lines.append(
+                {
+                    "role": "agent",
+                    "text": cleaned,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+            asyncio.ensure_future(send_transcript("agent", cleaned))
 
+    @session.on("session_stopped")
+    def on_session_stopped():
+        duration = int(time.time() - start_time)
+        asyncio.ensure_future(
+            end_call(
+                agent_config.get("call_id", ""),
+                transcript_lines,
+                duration,
+            )
+        )
+
+    def make_transfer_tool(room):
+        @function_tool
+        async def transfer_call(transfer_to: str) -> str:
+            """Transfer the current call to a human agent or another number.
+            Use this when the user asks to speak to a human, or when you cannot help them.
+            transfer_to: the phone number or department to transfer to.
+            """
+            try:
+                payload = json.dumps({"type": "transfer", "to": transfer_to})
+                await room.local_participant.publish_data(
+                    payload.encode(), reliable=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish transfer: {e}")
+            return "Transferring you now. Please hold."
+
+        return transfer_call
+
+    transfer_tool = make_transfer_tool(ctx.room)
     await session.start(
-        agent=Agent(instructions=system_prompt),
+        agent=Agent(instructions=system_prompt, tools=[transfer_tool]),
         room=ctx.room,
     )
 

@@ -1,4 +1,5 @@
-"use client"
+"use client";
+
 import {
   Area,
   AreaChart,
@@ -6,12 +7,12 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts"
-import { format, parseISO } from "date-fns"
+} from "recharts";
+import { format, parseISO } from "date-fns";
 
 interface DataPoint {
-  date: string
-  count: number
+  date: string;
+  count: number;
 }
 
 export function CallVolumeChart({ data }: { data: DataPoint[] }) {
@@ -35,13 +36,15 @@ export function CallVolumeChart({ data }: { data: DataPoint[] }) {
         <YAxis hide />
         <Tooltip
           contentStyle={{
-            background: "#fff",
-            border: "1px solid #E8E8F0",
+            background: "#FFFFFF",
+            border: "1px solid #E5E4F0",
             borderRadius: 8,
             fontSize: 12,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
           }}
-          labelFormatter={(v) => format(parseISO(v as string), "MMMM d, yyyy")}
+          labelFormatter={(v) =>
+            format(parseISO(v as string), "MMMM d, yyyy")
+          }
           formatter={(v: number) => [v, "Calls"]}
         />
         <Area
@@ -55,6 +58,5 @@ export function CallVolumeChart({ data }: { data: DataPoint[] }) {
         />
       </AreaChart>
     </ResponsiveContainer>
-  )
+  );
 }
-

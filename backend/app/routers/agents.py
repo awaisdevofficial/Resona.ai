@@ -12,6 +12,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.agent import Agent
 from app.models.call import Call
+from app.models.knowledge_base import KnowledgeBase
 from app.models.user import User
 from app.schemas.agent import AgentCreate, AgentResponse, AgentUpdate
 
@@ -60,15 +61,39 @@ async def get_agent(
 @router.patch("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
     agent_id: uuid.UUID,
-    body: AgentUpdate,
+    body: dict,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     agent = await db.get(Agent, agent_id)
     if not agent or agent.user_id != user.id:
         raise HTTPException(status_code=404, detail="Agent not found")
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(agent, field, value)
+
+    await db.refresh(agent)
+
+    allowed_fields = [
+        "name",
+        "description",
+        "system_prompt",
+        "first_message",
+        "llm_model",
+        "llm_temperature",
+        "llm_max_tokens",
+        "stt_provider",
+        "stt_model",
+        "stt_language",
+        "tts_provider",
+        "tts_voice_id",
+        "tts_stability",
+        "silence_timeout",
+        "max_duration",
+        "tools_config",
+        "is_active",
+    ]
+    for field, value in body.items():
+        if field in allowed_fields and hasattr(agent, field):
+            setattr(agent, field, value)
+
     await db.commit()
     await db.refresh(agent)
     return agent
@@ -138,19 +163,14 @@ async def create_web_call_token(
     room_name = f"webcall-{uuid.uuid4()}"
     call_id = uuid.uuid4()
 
-    # Create Call record so web test calls are persisted in Supabase
-    call = Call(
-        id=call_id,
-        user_id=user.id,
-        agent_id=agent.id,
-        direction="inbound",
-        status="ringing",
-        livekit_room=room_name,
-    )
-    db.add(call)
-    await db.commit()
-
-    metadata = json.dumps({
+    # Shared metadata used both for the Call record (DB) and LiveKit room
+    metadata_dict = {
+        "type": "web_test",
+        "test_title": f"Test call – {agent.name}",
+        "agent_id": str(agent.id),
+        "agent_name": agent.name,
+        "user_id": str(user.id),
+        "user_email": user.email,
         "system_prompt": agent.system_prompt,
         "first_message": agent.first_message,
         "llm_model": agent.llm_model or "gpt-4o-mini",
@@ -162,8 +182,33 @@ async def create_web_call_token(
         "silence_timeout": agent.silence_timeout or 30,
         "max_duration": agent.max_duration or 3600,
         "call_id": str(call_id),
-        "agent_speaks_first": agent.tools_config.get("agent_speaks_first", True) if agent.tools_config else True,
-    })
+        "agent_speaks_first": agent.tools_config.get("agent_speaks_first", True)
+        if agent.tools_config
+        else True,
+        "transfer_number": (agent.tools_config or {}).get("transfer_number", ""),
+    }
+
+    kb_result = await db.execute(
+        select(KnowledgeBase).where(KnowledgeBase.agent_id == agent.id)
+    )
+    kb_entries = kb_result.scalars().all()
+    knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
+    metadata_dict["knowledge_base"] = knowledge_base
+
+    # Create Call record so web test calls are persisted
+    call = Call(
+        id=call_id,
+        user_id=user.id,
+        agent_id=agent.id,
+        direction="inbound",
+        status="ringing",
+        livekit_room=room_name,
+        metadata_json=metadata_dict,
+    )
+    db.add(call)
+    await db.commit()
+
+    metadata = json.dumps(metadata_dict)
 
     token = (
         AccessToken(settings.LIVEKIT_API_KEY, settings.LIVEKIT_API_SECRET)
