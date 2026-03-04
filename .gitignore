@@ -1,0 +1,32 @@
+########################
+# Node / Next.js
+########################
+node_modules/
+.next/
+out/
+
+########################
+# Python
+########################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+########################
+# Environments & secrets
+########################
+.env
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+backend/.env
+
+########################
+# OS / editor files
+########################
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

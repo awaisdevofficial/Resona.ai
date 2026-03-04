@@ -1,0 +1,71 @@
+from datetime import datetime
+from typing import Any, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class AgentCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    system_prompt: str
+    first_message: Optional[str] = "Hello, how can I help you today?"
+    llm_model: str = "gpt-4o-mini"
+    llm_temperature: float = Field(0.7, ge=0.0, le=1.0)
+    llm_max_tokens: int = Field(500, ge=50, le=4000)
+    stt_provider: str = "deepgram"
+    stt_model: str = "nova-2-general"
+    stt_language: str = "en-US"
+    tts_provider: str = "elevenlabs"
+    tts_voice_id: Optional[str] = None
+    tts_stability: float = Field(0.5, ge=0.0, le=1.0)
+    silence_timeout: int = Field(30, ge=5, le=300)
+    max_duration: int = Field(3600, ge=60, le=14400)
+    tools_config: dict[str, Any] = {}
+
+
+class AgentUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    system_prompt: Optional[str] = None
+    first_message: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_temperature: Optional[float] = None
+    llm_max_tokens: Optional[int] = None
+    stt_provider: Optional[str] = None
+    stt_model: Optional[str] = None
+    stt_language: Optional[str] = None
+    tts_provider: Optional[str] = None
+    tts_voice_id: Optional[str] = None
+    tts_stability: Optional[float] = None
+    silence_timeout: Optional[int] = None
+    max_duration: Optional[int] = None
+    tools_config: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+
+class AgentResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    name: str
+    description: Optional[str]
+    system_prompt: str
+    first_message: Optional[str]
+    llm_model: str
+    llm_temperature: float
+    llm_max_tokens: int
+    stt_provider: str
+    stt_model: str
+    stt_language: str
+    tts_provider: str
+    tts_voice_id: Optional[str]
+    tts_stability: float
+    silence_timeout: int
+    max_duration: int
+    tools_config: dict
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
