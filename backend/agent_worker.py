@@ -178,19 +178,19 @@ async def entrypoint(ctx: JobContext):
         api_key=deepgram_key,
     )
 
-    # Barge-in: interrupt as soon as you start speaking. aec_warmup_duration=0 so we don't block
-    # interruptions for the first 3 seconds (default); min_interruption_duration=0 for instant interrupt.
+    # Session: default AEC warmup (3s) and interruption (0.5s) for stable TTS/STT.
+    # Shorter warmup (1s) and interrupt threshold (0.3s) for better barge-in without breaking pipeline.
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
         llm=llm,
         tts=tts,
         turn_detection="vad",
-        min_interruption_duration=0.0,
+        min_interruption_duration=0.3,
         min_interruption_words=0,
-        min_endpointing_delay=0.3,
-        max_endpointing_delay=2.0,
-        aec_warmup_duration=0,
+        min_endpointing_delay=0.5,
+        max_endpointing_delay=2.5,
+        aec_warmup_duration=1.0,
     )
 
     @session.on("user_input_transcribed")
