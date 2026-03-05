@@ -165,17 +165,8 @@ async def create_web_call_token(
     room_name = f"webcall-{uuid.uuid4()}"
     call_id = uuid.uuid4()
 
-    # Shared metadata used both for the Call record (DB) and LiveKit room
-    # Normalize TTS provider/voice defaults so they are compatible
-    provider = agent.tts_provider or (
-        "cartesia" if settings.CARTESIA_API_KEY else "deepgram"
-    )
-    voice_id = agent.tts_voice_id
-    if not voice_id:
-        if provider == "deepgram":
-            voice_id = "aura-2-andromeda-en"
-        else:
-            voice_id = "default"
+    # Cartesia only for TTS; voice default
+    voice_id = agent.tts_voice_id or "default"
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
     max_prompt = getattr(settings, "MAX_SYSTEM_PROMPT_LEN", 8000)
@@ -197,7 +188,8 @@ async def create_web_call_token(
         "llm_temperature": agent.llm_temperature or 0.7,
         "llm_max_tokens": agent.llm_max_tokens or 500,
         "stt_language": agent.stt_language or "en-US",
-        "tts_provider": provider,
+        "stt_model": agent.stt_model or "ink-whisper",
+        "tts_provider": "cartesia",
         "tts_voice_id": voice_id,
         "tts_stability": agent.tts_stability or 0.5,
         "silence_timeout": int(agent.silence_timeout or 30),

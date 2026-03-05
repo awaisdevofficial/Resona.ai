@@ -27,10 +27,9 @@ class Settings(BaseSettings):
     LIVEKIT_API_SECRET: str
     LIVEKIT_SIP_URI: str = ""
 
-    # AI
+    # AI (Cartesia for STT + TTS; Groq for LLM)
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    DEEPGRAM_API_KEY: str
     CARTESIA_API_KEY: str = ""
 
     # Supabase

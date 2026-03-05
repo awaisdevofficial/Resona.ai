@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button"
 import { api, API_BASE_URL, getAuthToken } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
 
-export type VoiceProvider = "cartesia" | "deepgram" | "chatterbox"
+export type VoiceProvider = "cartesia" | "chatterbox"
 
 export interface Voice {
   id: string
@@ -417,7 +417,6 @@ function initials(name: string) {
 function providerLabel(provider: string) {
   const id = provider.toLowerCase()
   if (id === "cartesia") return "Cartesia"
-  if (id === "deepgram") return "Deepgram Aura"
   if (id === "chatterbox") return "Chatterbox (offline)"
   return provider
 }

@@ -38,7 +38,7 @@ async def get_default_agent_config(
     return {
         "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "tts_provider": agent.tts_provider or "deepgram",
-        "tts_voice_id": agent.tts_voice_id or "aura-asteria-en",
+        "tts_provider": agent.tts_provider or "cartesia",
+        "tts_voice_id": agent.tts_voice_id or "default",
     }
 

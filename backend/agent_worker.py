@@ -19,7 +19,7 @@ from livekit.agents import (
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
-from livekit.plugins import cartesia, deepgram, silero, groq
+from livekit.plugins import cartesia, silero, groq
 
 load_dotenv()
 
@@ -100,8 +100,8 @@ async def entrypoint(ctx: JobContext):
             agent_config = {
                 "system_prompt": "You are a helpful voice AI assistant.",
                 "first_message": "Hi, how can I help you today?",
-                "tts_provider": "deepgram",
-                "tts_voice_id": "aura-asteria-en",
+                "tts_provider": "cartesia",
+                "tts_voice_id": "default",
             }
 
     base_system_prompt = agent_config.get(
@@ -126,35 +126,8 @@ async def entrypoint(ctx: JobContext):
     # Determine TTS/STT configuration from metadata
     stt_language = agent_config.get("stt_language", "en-US")
 
-    # Determine TTS provider & voice id
-    tts_provider = (agent_config.get("tts_provider") or "").lower()
-    tts_voice_id = agent_config.get("tts_voice_id")
-
-    # Default preference: Cartesia → Deepgram, depending on environment
-    if not tts_provider:
-        if os.environ.get("CARTESIA_API_KEY"):
-            tts_provider = "cartesia"
-        else:
-            tts_provider = "deepgram"
-
-    # Deepgram TTS uses Aura 2 model names (e.g. aura-2-andromeda-en). Map legacy ids.
-    DEEPGRAM_MODEL_MAP = {
-        "aura-asteria-en": "aura-2-andromeda-en",
-        "aura-orion-en": "aura-2-andromeda-en",
-        "aura-stella-en": "aura-2-athena-en",
-        "aura-athena-en": "aura-2-athena-en",
-        "aura-hera-en": "aura-2-athena-en",
-    }
-    if tts_provider == "deepgram":
-        if not tts_voice_id:
-            tts_voice_id = "aura-2-andromeda-en"
-        elif tts_voice_id in DEEPGRAM_MODEL_MAP:
-            tts_voice_id = DEEPGRAM_MODEL_MAP[tts_voice_id]
-        elif not tts_voice_id.startswith("aura-2-"):
-            tts_voice_id = "aura-2-andromeda-en"
-    else:
-        if not tts_voice_id:
-            tts_voice_id = "default"
+    # TTS: Cartesia only
+    tts_voice_id = agent_config.get("tts_voice_id") or "default"
 
     # Track transcript lines and call duration
     transcript_lines: list[dict] = []
@@ -169,59 +142,29 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
-    # Shared STT / LLM configuration
-    stt = deepgram.STT(
-        model="nova-2-general",
-        api_key=os.environ.get("DEEPGRAM_API_KEY"),
+    # STT + LLM + TTS: Cartesia for STT and TTS, Groq for LLM
+    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
+    if not cartesia_key:
+        raise RuntimeError(
+            "CARTESIA_API_KEY is required for STT and TTS. Set it in the environment."
+        )
+
+    stt_model = agent_config.get("stt_model") or "ink-whisper"
+    stt = cartesia.STT(
+        model=stt_model,
+        api_key=cartesia_key,
+        language=_cartesia_language_from_stt(stt_language),
     )
     llm = groq.LLM(
         model="llama-3.3-70b-versatile",
         api_key=os.environ.get("GROQ_API_KEY"),
     )
-
-    # Choose TTS: validate API keys and fall back if the chosen provider has no key
-    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
-    deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "").strip()
-
-    if tts_provider == "cartesia" and not cartesia_key:
-        logger.warning("CARTESIA_API_KEY not set; falling back to Deepgram TTS")
-        tts_provider = "deepgram"
-    if tts_provider == "deepgram" and not deepgram_key:
-        logger.warning("DEEPGRAM_API_KEY not set; falling back to Cartesia TTS")
-        tts_provider = "cartesia"
-
-    if tts_provider == "cartesia" and cartesia_key:
-        tts = cartesia.TTS(
-            api_key=cartesia_key,
-            voice=tts_voice_id,
-            model="sonic-3",
-            language=_cartesia_language_from_stt(stt_language),
-        )
-    elif tts_provider == "deepgram" and deepgram_key:
-        from livekit.plugins import deepgram as dg_plugins
-
-        tts = dg_plugins.TTS(
-            model=tts_voice_id,
-            api_key=deepgram_key,
-        )
-    else:
-        # Final fallback: prefer Deepgram if we have key, else Cartesia
-        if deepgram_key:
-            from livekit.plugins import deepgram as dg_plugins
-
-            model = tts_voice_id if (tts_voice_id or "").startswith("aura") else "aura-2-andromeda-en"
-            tts = dg_plugins.TTS(model=model, api_key=deepgram_key)
-        elif cartesia_key:
-            tts = cartesia.TTS(
-                api_key=cartesia_key,
-                voice=tts_voice_id or "default",
-                model="sonic-3",
-                language="en",
-            )
-        else:
-            raise RuntimeError(
-                "No TTS API key available. Set CARTESIA_API_KEY or DEEPGRAM_API_KEY in the environment."
-            )
+    tts = cartesia.TTS(
+        api_key=cartesia_key,
+        voice=tts_voice_id,
+        model="sonic-3",
+        language=_cartesia_language_from_stt(stt_language),
+    )
 
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],

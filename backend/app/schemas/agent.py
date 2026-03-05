@@ -28,8 +28,8 @@ class AgentCreate(BaseModel):
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(0.7, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(500, ge=50, le=4000)
-    stt_provider: str = "deepgram"
-    stt_model: str = "nova-2-general"
+    stt_provider: str = "cartesia"
+    stt_model: str = "ink-whisper"
     stt_language: str = "en-US"
     tts_provider: str = "cartesia"
     tts_voice_id: Optional[str] = None
