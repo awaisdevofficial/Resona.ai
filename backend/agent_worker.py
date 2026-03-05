@@ -265,8 +265,12 @@ async def entrypoint(ctx: JobContext):
     )
 
     agent_speaks_first = agent_config.get("agent_speaks_first", True)
-    if agent_speaks_first:
-        await session.say(first_message, allow_interruptions=True)
+    say_text = (first_message or "Hi, how can I help you today?").strip()
+    if agent_speaks_first and say_text:
+        try:
+            await session.say(say_text, allow_interruptions=True)
+        except Exception as e:
+            logger.exception("Agent TTS/say failed: %s", e)
 
 
 if __name__ == "__main__":

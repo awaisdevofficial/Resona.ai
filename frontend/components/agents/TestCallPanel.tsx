@@ -50,6 +50,7 @@ export function TestCallPanel({
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState(0)
+  const [agentAudioBlocked, setAgentAudioBlocked] = useState(false)
 
   const roomRef = useRef<Room | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -169,13 +170,19 @@ export function TestCallPanel({
         (
           track: RemoteTrack,
           _pub: RemoteTrackPublication,
-          _participant: RemoteParticipant
+          participant: RemoteParticipant
         ) => {
           if (track.kind === Track.Kind.Audio) {
-            const el = track.attach()
+            const el = track.attach() as HTMLAudioElement
             el.autoplay = true
-            audioRef.current = el as HTMLAudioElement
+            el.muted = false
+            audioRef.current = el
             document.body.appendChild(el)
+            // Browsers often require explicit play() after user gesture; Start Call is the gesture
+            el.play().catch((e) => {
+              console.warn("Agent audio autoplay blocked:", e)
+              setAgentAudioBlocked(true)
+            })
           }
         }
       )
@@ -249,6 +256,14 @@ export function TestCallPanel({
     if (audioRef.current) {
       audioRef.current.remove()
       audioRef.current = null
+    }
+    setAgentAudioBlocked(false)
+  }, [])
+
+  const playAgentAudio = useCallback(() => {
+    const el = audioRef.current
+    if (el) {
+      el.play().then(() => setAgentAudioBlocked(false)).catch(() => {})
     }
   }, [])
 
@@ -376,6 +391,22 @@ export function TestCallPanel({
         {error && (
           <div className="mx-5 mb-3 rounded-input border border-error/30 bg-red-50 px-3 py-2 text-label text-error">
             {error}
+          </div>
+        )}
+
+        {agentAudioBlocked && callState === "connected" && (
+          <div className="mx-5 mb-3 rounded-input border border-amber-200 bg-amber-50 px-3 py-2 text-label text-amber-800">
+            <p className="font-medium">No sound?</p>
+            <p className="mt-0.5 text-[11px]">
+              Your browser may have blocked audio. Click the button below to hear the agent.
+            </p>
+            <button
+              type="button"
+              onClick={playAgentAudio}
+              className="mt-2 px-3 py-1.5 rounded-lg bg-amber-200 text-amber-900 text-xs font-medium hover:bg-amber-300"
+            >
+              Play agent audio
+            </button>
           </div>
         )}
 
