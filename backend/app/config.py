@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # LiveKit
     LIVEKIT_URL: str
+    LIVEKIT_API_URL: str = ""  # HTTP URL for LiveKit API (SIP/twirp); e.g. https://host:7880
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
     LIVEKIT_SIP_URI: str = ""
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     DEEPGRAM_API_KEY: str
-    ELEVENLABS_API_KEY: str
+    CARTESIA_API_KEY: str = ""
 
     # Supabase
     SUPABASE_URL: str

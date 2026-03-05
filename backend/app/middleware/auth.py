@@ -18,7 +18,8 @@ security = HTTPBearer(auto_error=False)
 
 async def _get_or_create_dev_user(db: AsyncSession) -> User:
     """Return a stable dev user when running without auth in DEV_MODE."""
-    result = await db.execute(select(User).order_by(User.created_at.asc()))
+    # Prefer a dedicated dev user record identified by a fixed clerk_id
+    result = await db.execute(select(User).where(User.clerk_id == "dev-user"))
     user = result.scalar_one_or_none()
     if user:
         return user

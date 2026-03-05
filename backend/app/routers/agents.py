@@ -1,7 +1,9 @@
+import os
 from typing import List
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.prompts import HUMAN_BEHAVIOR_PROMPT, get_full_system_prompt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
@@ -164,6 +166,19 @@ async def create_web_call_token(
     call_id = uuid.uuid4()
 
     # Shared metadata used both for the Call record (DB) and LiveKit room
+    # Normalize TTS provider/voice defaults so they are compatible
+    provider = agent.tts_provider or (
+        "cartesia" if settings.CARTESIA_API_KEY else "deepgram"
+    )
+    voice_id = agent.tts_voice_id
+    if not voice_id:
+        if provider == "deepgram":
+            voice_id = "aura-asteria-en"
+        else:
+            # Let Cartesia use its own default when id is "default"
+            voice_id = "default"
+
+    full_system_prompt = get_full_system_prompt(agent.system_prompt)
     metadata_dict = {
         "type": "web_test",
         "test_title": f"Test call – {agent.name}",
@@ -171,16 +186,17 @@ async def create_web_call_token(
         "agent_name": agent.name,
         "user_id": str(user.id),
         "user_email": user.email,
-        "system_prompt": agent.system_prompt,
+        "system_prompt": full_system_prompt,
         "first_message": agent.first_message,
         "llm_model": agent.llm_model or "gpt-4o-mini",
         "llm_temperature": agent.llm_temperature or 0.7,
         "llm_max_tokens": agent.llm_max_tokens or 500,
         "stt_language": agent.stt_language or "en-US",
-        "tts_voice_id": agent.tts_voice_id or "Rachel",
+        "tts_provider": provider,
+        "tts_voice_id": voice_id,
         "tts_stability": agent.tts_stability or 0.5,
-        "silence_timeout": agent.silence_timeout or 30,
-        "max_duration": agent.max_duration or 3600,
+        "silence_timeout": int(agent.silence_timeout or 30),
+        "max_duration": int(agent.max_duration or 3600),
         "call_id": str(call_id),
         "agent_speaks_first": agent.tools_config.get("agent_speaks_first", True)
         if agent.tools_config
@@ -220,7 +236,7 @@ async def create_web_call_token(
     )
 
     async with LiveKitAPI(
-        url=settings.LIVEKIT_URL,
+        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     ) as lk:
@@ -238,142 +254,4 @@ async def create_web_call_token(
         "livekit_url": settings.LIVEKIT_URL,
         "call_id": str(call_id),
     }
-
-
-@router.post("/voice-preview-by-name")
-async def voice_preview_by_name(
-    body: dict,
-    user: User = Depends(get_current_user),
-):
-    from fastapi.responses import StreamingResponse
-
-    VOICE_NAME_TO_ID = {
-        "Rachel": "21m00Tcm4TlvDq8ikWAM",
-        "Drew": "29vD33N1vc5IkxM6UTqy",
-        "Clyde": "2EiwWnXFnvU5JabPnv8n",
-        "Paul": "5Q0t7uMcjvnagumLfvZi",
-        "Domi": "AZnzlk1XvdvUeBnXmlld",
-        "Dave": "CYw3kZ78EhJOlQCFuako",
-        "Fin": "D38z5RcWu1voky8WS1ja",
-        "Bella": "EXAVITQu4vr4xnSDxMaL",
-        "Antoni": "ErXwobaYiN019PkySvjV",
-        "Thomas": "GBv7mTt0atIp3Br8iCZE",
-        "Charlie": "IKne3meq5aSn9XLyUdCD",
-        "Emily": "LcfcDJNUP1GQjkzn1xUU",
-        "Elli": "MF3mGyEYCl7XYWbV9V6O",
-        "Callum": "N2lVS1w4EtoT3dr4eOWO",
-        "Patrick": "ODq5zmih8GrVes37Dy9p",
-        "Harry": "SOYHLrjzK2X1ezoPC6cr",
-        "Liam": "TX3LPaxmHKxFdv7VOQHJ",
-        "Dorothy": "ThT5KcBeYPX3keUQqHPh",
-        "Josh": "TxGEqnHWrfWFTfGW9XjX",
-        "Arnold": "VR6AewLTigWG4xSOukaG",
-        "Charlotte": "XB0fDUnXU5powFXDhCwa",
-        "Alice": "Xb7hH8MSUJpSbSDYk0k2",
-        "Matilda": "XrExE9yKIg1WjnnlVkGX",
-        "James": "ZQe5CZNOzWyzPSCn5a3c",
-        "Joseph": "Zlb1dXrM653N07WRdFW3",
-    }
-
-    voice_name = body.get("voice_id", "Rachel")
-    voice_id = VOICE_NAME_TO_ID.get(voice_name, "21m00Tcm4TlvDq8ikWAM")
-    preview_text = f"Hi, I'm {voice_name}. I'm your AI voice assistant, ready to help you on every call."
-
-    async def stream_audio():
-        async with _httpx.AsyncClient(timeout=30) as client:
-            async with client.stream(
-                "POST",
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-                headers={
-                    "xi-api-key": settings.ELEVENLABS_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "text": preview_text,
-                    "model_id": "eleven_turbo_v2",
-                    "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
-                },
-            ) as resp:
-                if resp.status_code != 200:
-                    raise HTTPException(502, "ElevenLabs TTS failed")
-                async for chunk in resp.aiter_bytes():
-                    yield chunk
-
-    return StreamingResponse(stream_audio(), media_type="audio/mpeg")
-
-
-@router.post("/{agent_id}/voice-preview")
-async def voice_preview(
-    agent_id: uuid.UUID,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Calls ElevenLabs TTS with a fixed preview sentence using the agent's
-    selected voice and streams the audio back to the browser.
-    """
-    from fastapi.responses import StreamingResponse
-
-    agent = await db.get(Agent, agent_id)
-    if not agent or agent.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Agent not found")
-
-    VOICE_NAME_TO_ID = {
-        "Rachel": "21m00Tcm4TlvDq8ikWAM",
-        "Drew": "29vD33N1vc5IkxM6UTqy",
-        "Clyde": "2EiwWnXFnvU5JabPnv8n",
-        "Paul": "5Q0t7uMcjvnagumLfvZi",
-        "Domi": "AZnzlk1XvdvUeBnXmlld",
-        "Dave": "CYw3kZ78EhJOlQCFuako",
-        "Fin": "D38z5RcWu1voky8WS1ja",
-        "Bella": "EXAVITQu4vr4xnSDxMaL",
-        "Antoni": "ErXwobaYiN019PkySvjV",
-        "Thomas": "GBv7mTt0atIp3Br8iCZE",
-        "Charlie": "IKne3meq5aSn9XLyUdCD",
-        "Emily": "LcfcDJNUP1GQjkzn1xUU",
-        "Elli": "MF3mGyEYCl7XYWbV9V6O",
-        "Callum": "N2lVS1w4EtoT3dr4eOWO",
-        "Patrick": "ODq5zmih8GrVes37Dy9p",
-        "Harry": "SOYHLrjzK2X1ezoPC6cr",
-        "Liam": "TX3LPaxmHKxFdv7VOQHJ",
-        "Dorothy": "ThT5KcBeYPX3keUQqHPh",
-        "Josh": "TxGEqnHWrfWFTfGW9XjX",
-        "Arnold": "VR6AewLTigWG4xSOukaG",
-        "Charlotte": "XB0fDUnXU5powFXDhCwa",
-        "Alice": "Xb7hH8MSUJpSbSDYk0k2",
-        "Matilda": "XrExE9yKIg1WjnnlVkGX",
-        "James": "ZQe5CZNOzWyzPSCn5a3c",
-        "Joseph": "Zlb1dXrM653N07WRdFW3",
-    }
-    voice_name = agent.tts_voice_id or "Rachel"
-    voice_id = VOICE_NAME_TO_ID.get(voice_name, "21m00Tcm4TlvDq8ikWAM")
-    preview_text = (
-        f"Hi, I'm {agent.name}. "
-        "I'm your AI voice assistant, ready to help you on every call."
-    )
-
-    async def stream_audio():
-        async with _httpx.AsyncClient(timeout=30) as client:
-            async with client.stream(
-                "POST",
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-                headers={
-                    "xi-api-key": settings.ELEVENLABS_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "text": preview_text,
-                    "model_id": "eleven_turbo_v2",
-                    "voice_settings": {
-                        "stability": agent.tts_stability or 0.5,
-                        "similarity_boost": 0.8,
-                    },
-                },
-            ) as resp:
-                if resp.status_code != 200:
-                    raise HTTPException(502, "ElevenLabs TTS failed")
-                async for chunk in resp.aiter_bytes():
-                    yield chunk
-
-    return StreamingResponse(stream_audio(), media_type="audio/mpeg")
 

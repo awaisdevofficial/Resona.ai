@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/PageHeader"
 import { TestCallPanel } from "@/components/agents/TestCallPanel"
 import { api } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
+import { VoiceLibrary, Voice } from "@/components/agents/VoiceLibrary"
 
 const FIXED_DEFAULTS = {
   llm_model: "gpt-4o-mini",
@@ -19,36 +20,17 @@ const FIXED_DEFAULTS = {
   stt_provider: "deepgram",
   stt_model: "nova-2-general",
   stt_language: "en-US",
-  tts_provider: "elevenlabs",
+  tts_provider: "cartesia",
   tts_stability: 0.5,
 }
 
-const VOICE_OPTIONS = [
-  { label: "Rachel — Calm, professional female", value: "Rachel" },
-  { label: "Drew — Friendly male", value: "Drew" },
-  { label: "Clyde — Deep male", value: "Clyde" },
-  { label: "Paul — Authoritative male", value: "Paul" },
-  { label: "Domi — Energetic female", value: "Domi" },
-  { label: "Dave — Conversational male", value: "Dave" },
-  { label: "Fin — Irish male", value: "Fin" },
-  { label: "Bella — Soft female", value: "Bella" },
-  { label: "Antoni — Well-rounded male", value: "Antoni" },
-  { label: "Thomas — Calm male", value: "Thomas" },
-  { label: "Charlie — Natural Australian male", value: "Charlie" },
-  { label: "Emily — Calm female", value: "Emily" },
-  { label: "Elli — Emotional female", value: "Elli" },
-  { label: "Callum — Intense male", value: "Callum" },
-  { label: "Patrick — Confident male", value: "Patrick" },
-  { label: "Harry — Anxious male", value: "Harry" },
-  { label: "Liam — Articulate male", value: "Liam" },
-  { label: "Dorothy — Warm British female", value: "Dorothy" },
-  { label: "Josh — Deep male", value: "Josh" },
-  { label: "Arnold — Crisp male", value: "Arnold" },
-  { label: "Charlotte — Seductive female", value: "Charlotte" },
-  { label: "Alice — Confident British female", value: "Alice" },
-  { label: "Matilda — Warm Australian female", value: "Matilda" },
-  { label: "James — Calm British male", value: "James" },
-  { label: "Joseph — Grounded male", value: "Joseph" },
+const LANGUAGE_OPTIONS = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "es-ES", label: "Spanish (Spain)" },
+  { value: "es-US", label: "Spanish (US)" },
+  { value: "fr-FR", label: "French" },
+  { value: "de-DE", label: "German" },
 ]
 
 interface AgentFormValues {
@@ -57,6 +39,8 @@ interface AgentFormValues {
   system_prompt: string
   first_message: string
   tts_voice_id: string
+  tts_provider?: string
+  stt_language: string
   silence_timeout: number
   max_duration: number
   agent_speaks_first: boolean
@@ -74,6 +58,7 @@ export default function AgentEditPage({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"config" | "knowledge">("config")
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [voiceLibraryOpen, setVoiceLibraryOpen] = useState(false)
 
   const { data: agent, isLoading } = useQuery({
     queryKey: ["agent", params.id],
@@ -86,7 +71,9 @@ export default function AgentEditPage({
       description: "",
       system_prompt: "",
       first_message: "",
-      tts_voice_id: "Rachel",
+      tts_voice_id: "",
+      tts_provider: "cartesia",
+      stt_language: "en-US",
       silence_timeout: 30,
       max_duration: 3600,
       agent_speaks_first: true,
@@ -101,7 +88,9 @@ export default function AgentEditPage({
         description: agent.description || "",
         system_prompt: agent.system_prompt || "",
         first_message: agent.first_message || "",
-        tts_voice_id: agent.tts_voice_id || "Rachel",
+        tts_voice_id: agent.tts_voice_id || "",
+        tts_provider: agent.tts_provider || "cartesia",
+        stt_language: agent.stt_language || "en-US",
         silence_timeout: agent.silence_timeout || 30,
         max_duration: agent.max_duration || 3600,
         agent_speaks_first: agent.tools_config?.agent_speaks_first ?? true,
@@ -114,6 +103,8 @@ export default function AgentEditPage({
   const watchedFirstMessage = form.watch("first_message")
   const watchedSystemPrompt = form.watch("system_prompt")
   const watchedVoice = form.watch("tts_voice_id")
+  const watchedProvider = form.watch("tts_provider")
+  const watchedLanguage = form.watch("stt_language")
   const watchedSilenceTimeout = form.watch("silence_timeout")
   const watchedMaxDuration = form.watch("max_duration")
 
@@ -122,6 +113,7 @@ export default function AgentEditPage({
       api.patch(`/v1/agents/${params.id}`, {
         ...FIXED_DEFAULTS,
         ...values,
+        tts_provider: values.tts_provider || FIXED_DEFAULTS.tts_provider,
         tools_config: {
           agent_speaks_first: values.agent_speaks_first,
           transfer_number: values.transfer_number || undefined,
@@ -134,7 +126,8 @@ export default function AgentEditPage({
         description: updatedAgent.description || "",
         system_prompt: updatedAgent.system_prompt || "",
         first_message: updatedAgent.first_message || "",
-        tts_voice_id: updatedAgent.tts_voice_id || "Rachel",
+        tts_voice_id: updatedAgent.tts_voice_id || "",
+        tts_provider: updatedAgent.tts_provider || "cartesia",
         silence_timeout: updatedAgent.silence_timeout || 30,
         max_duration: updatedAgent.max_duration || 3600,
         agent_speaks_first:
@@ -159,13 +152,18 @@ export default function AgentEditPage({
         token = await (window as any).Clerk.session.getToken()
       }
       const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const response = await fetch(`${BASE_URL}/v1/agents/voice-preview-by-name`, {
+      const response = await fetch(`${BASE_URL}/v1/voices/preview`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ voice_id: form.getValues("tts_voice_id") }),
+        body: JSON.stringify({
+          voice_id: form.getValues("tts_voice_id") || agent.tts_voice_id,
+          provider: form.getValues("tts_provider") || agent.tts_provider || "cartesia",
+          text:
+            "Hi, I am your AI voice assistant, ready to help you on every call.",
+        }),
       })
       if (!response.ok) throw new Error("Preview failed")
       const blob = await response.blob()
@@ -175,7 +173,7 @@ export default function AgentEditPage({
       audio.play()
       audio.onended = () => URL.revokeObjectURL(url)
     } catch {
-      toast.error("Voice preview failed. Check your ElevenLabs API key.")
+      toast.error("Voice preview failed.")
     } finally {
       setPreviewLoading(false)
     }
@@ -210,7 +208,7 @@ export default function AgentEditPage({
     watchedSystemPrompt ||
     agent.system_prompt ||
     "You are a helpful, friendly voice AI agent."
-  const displayVoice = watchedVoice || agent.tts_voice_id || "Rachel"
+  const displayVoice = watchedVoice || agent.tts_voice_id || "Default"
   const displaySilenceTimeout = watchedSilenceTimeout ?? agent.silence_timeout ?? 30
   const displayMaxDuration = watchedMaxDuration ?? agent.max_duration ?? 3600
 
@@ -296,9 +294,14 @@ export default function AgentEditPage({
                     </label>
                     <input
                       type="text"
-                      {...form.register("name")}
+                      {...form.register("name", { required: "Agent name is required" })}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
                     />
+                    {form.formState.errors.name && (
+                      <p className="text-[11px] text-red-500 mt-0.5">
+                        {form.formState.errors.name.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-[#4B5563]">
@@ -320,10 +323,17 @@ export default function AgentEditPage({
                       System prompt
                     </label>
                     <textarea
-                      {...form.register("system_prompt")}
+                      {...form.register("system_prompt", {
+                        required: "System prompt is required",
+                      })}
                       rows={4}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60 resize-none"
                     />
+                    {form.formState.errors.system_prompt && (
+                      <p className="text-[11px] text-red-500 mt-0.5">
+                        {form.formState.errors.system_prompt.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-[#4B5563]">
@@ -331,9 +341,16 @@ export default function AgentEditPage({
                     </label>
                     <input
                       type="text"
-                      {...form.register("first_message")}
+                      {...form.register("first_message", {
+                        required: "First message is required",
+                      })}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
                     />
+                    {form.formState.errors.first_message && (
+                      <p className="text-[11px] text-red-500 mt-0.5">
+                        {form.formState.errors.first_message.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-[#4B5563]">
@@ -375,26 +392,36 @@ export default function AgentEditPage({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h2 className="text-sm font-semibold text-[#111122]">Voice</h2>
-                  <div className="space-y-2">
-                    <label className="block text-xs font-medium text-[#4B5563]">
-                      Agent voice
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2 min-w-0">
-                      <select
-                        {...form.register("tts_voice_id")}
-                        className="flex-1 min-w-0 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-semibold">
+                        {(displayVoice || "AI").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-[#4B5563]">
+                          Speaking voice
+                        </p>
+                        <p className="text-sm text-[#111827] truncate">
+                          {displayVoice || "Cartesia default voice"}
+                        </p>
+                        <p className="text-[11px] text-[#9CA3AF]">
+                          Provider: {(watchedProvider || agent.tts_provider || "cartesia").toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setVoiceLibraryOpen(true)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-medium text-primary hover:bg-gray-50 transition-colors"
                       >
-                        {VOICE_OPTIONS.map((v) => (
-                          <option key={v.value} value={v.value}>
-                            {v.label}
-                          </option>
-                        ))}
-                      </select>
+                        Change voice
+                      </button>
                       <button
                         type="button"
                         onClick={previewVoice}
                         disabled={previewLoading}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-muted hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-medium text-muted hover:bg-gray-50 transition-colors disabled:opacity-50"
                       >
                         {previewLoading ? (
                           <Loader2 size={13} className="animate-spin" />
@@ -405,8 +432,13 @@ export default function AgentEditPage({
                       </button>
                     </div>
                     <p className="text-[11px] text-[#9CA3AF]">
-                      Powered by ElevenLabs. Click Preview to hear a sample.
+                      Browse real human voices powered by Cartesia or Deepgram.
                     </p>
+                    {form.formState.errors.tts_voice_id && (
+                      <p className="text-[11px] text-red-500">
+                        {form.formState.errors.tts_voice_id.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -414,6 +446,26 @@ export default function AgentEditPage({
                   <h2 className="text-sm font-semibold text-[#111122]">
                     Call behaviour
                   </h2>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-[#4B5563]">
+                      Language
+                    </label>
+                    <select
+                      {...form.register("stt_language", {
+                        required: "Language is required",
+                      })}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
+                    >
+                      {LANGUAGE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-[#9CA3AF]">
+                      Supported languages for speech recognition and synthesis.
+                    </p>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="block text-xs font-medium text-[#4B5563]">
@@ -524,9 +576,9 @@ export default function AgentEditPage({
                       {displayName || "Untitled agent"}
                     </p>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand border border-brand/20 shrink-0 w-fit">
-                    {displayVoice}
-                  </span>
+                <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand border border-brand/20 shrink-0 w-fit">
+                  {displayVoice}
+                </span>
                 </div>
 
                 <div className="space-y-1">
@@ -561,16 +613,10 @@ export default function AgentEditPage({
                 <p className="text-xs text-muted">Changes here are autosynced to your next test call.</p>
                 <button
                   type="button"
-                  onClick={previewVoice}
-                  disabled={previewLoading}
-                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-medium text-primary hover:bg-gray-50 transition-colors disabled:opacity-60 w-full sm:w-auto"
+                  onClick={() => setVoiceLibraryOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-medium text-primary hover:bg-gray-50 transition-colors w-full sm:w-auto"
                 >
-                  {previewLoading ? (
-                    <Loader2 size={14} className="animate-spin shrink-0" />
-                  ) : (
-                    <Play size={14} className="shrink-0" />
-                  )}
-                  Voice preview
+                  Change voice
                 </button>
               </div>
             </div>
@@ -584,6 +630,16 @@ export default function AgentEditPage({
         agentName={displayName || agent.name}
         open={testPanelOpen}
         onClose={() => setTestPanelOpen(false)}
+      />
+      <VoiceLibrary
+        open={voiceLibraryOpen}
+        onClose={() => setVoiceLibraryOpen(false)}
+        selectedVoiceId={watchedVoice || agent.tts_voice_id}
+        selectedProvider={watchedProvider || agent.tts_provider}
+        onSelect={(voice: Voice) => {
+          form.setValue("tts_voice_id", voice.id)
+          form.setValue("tts_provider", voice.provider)
+        }}
       />
     </>
   )

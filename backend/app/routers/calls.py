@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import List, Optional
 import uuid
@@ -12,12 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import AsyncSessionLocal, get_db
+from app.prompts import get_full_system_prompt
 from app.middleware.auth import get_current_user, verify_internal_secret
 from app.models.agent import Agent
 from app.models.call import Call
 from app.models.knowledge_base import KnowledgeBase
 from app.models.phone_number import PhoneNumber
 from app.models.user import User
+from app.models.user_settings import UserSettings
 from app.models.webhook import Webhook
 from app.schemas.call import (
     CallCreate,
@@ -126,11 +129,10 @@ async def make_outbound_call(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Initiate an outbound call: agent calls to_number via Twilio → LiveKit."""
-    from twilio.rest import Client
-
+    """Initiate an outbound call using the user's Twilio phone setup."""
     from livekit import api as livekit_api
     from livekit.protocol.room import CreateRoomRequest
+    from app.services.sip_service import make_outbound_sip_call
 
     agent_id = body.get("agent_id")
     to_number = body.get("to_number")
@@ -140,50 +142,70 @@ async def make_outbound_call(
     if not to_number:
         raise HTTPException(status_code=400, detail="to_number is required")
 
+    # Get user SIP settings
+    result = await db.execute(
+        select(UserSettings).where(UserSettings.user_id == user.id)
+    )
+    user_settings = result.scalar_one_or_none()
+
+    if not user_settings or not user_settings.sip_configured:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "sip_not_configured",
+                "message": "Please complete Twilio phone setup in Settings first",
+                "setup_url": "/settings",
+            },
+        )
+
+    # Get agent
     agent = await db.get(Agent, uuid.UUID(agent_id))
     if not agent or agent.user_id != user.id:
         raise HTTPException(status_code=404, detail="Agent not found")
     await db.refresh(agent)
 
-    # Get phone number assigned to this agent
-    result = await db.execute(
-        select(PhoneNumber).where(
-            PhoneNumber.agent_id == agent.id,
-            PhoneNumber.is_active.is_(True),
-        )
-    )
-    phone_record = result.scalar_one_or_none()
-    from_number = phone_record.number if phone_record else settings.TWILIO_FROM_NUMBER
-    if not from_number:
-        raise HTTPException(
-            status_code=400,
-            detail="No phone number assigned to this agent and TWILIO_FROM_NUMBER not set.",
-        )
-
-    room_name = f"call-{uuid.uuid4()}"
-    call_id = uuid.uuid4()
-
+    # Fetch KB
     kb_result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.agent_id == agent.id)
     )
     kb_entries = kb_result.scalars().all()
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
-    metadata = json.dumps({
-        "system_prompt": agent.system_prompt or "You are a helpful voice AI assistant.",
-        "first_message": agent.first_message or "Hi, how can I help you today?",
-        "tts_voice_id": agent.tts_voice_id or "Rachel",
-        "silence_timeout": agent.silence_timeout or 30,
-        "max_duration": agent.max_duration or 3600,
-        "call_id": str(call_id),
-        "agent_speaks_first": True,
-        "transfer_number": agent.tools_config.get("transfer_number", "") if agent.tools_config else "",
-        "knowledge_base": knowledge_base,
-    })
+    # Normalize TTS provider/voice defaults so they are compatible
+    provider = agent.tts_provider or (
+        "cartesia" if settings.CARTESIA_API_KEY else "deepgram"
+    )
+    voice_id = agent.tts_voice_id
+    if not voice_id:
+        if provider == "deepgram":
+            voice_id = "aura-asteria-en"
+        else:
+            voice_id = "default"
 
-    # Create LiveKit room first
+    # Create room with metadata
+    room_name = f"sip-{user.id}-{uuid.uuid4()}"
+    call_id = uuid.uuid4()
+
+    full_system_prompt = get_full_system_prompt(agent.system_prompt)
+    metadata = json.dumps(
+        {
+            "system_prompt": full_system_prompt,
+            "first_message": agent.first_message
+            or "Hi, how can I help you today?",
+            "tts_voice_id": voice_id,
+            "tts_provider": provider,
+            "silence_timeout": int(agent.silence_timeout or 30),
+            "max_duration": int(agent.max_duration or 3600),
+            "call_id": str(call_id),
+            "agent_speaks_first": True,
+            "user_id": str(user.id),
+            "knowledge_base": knowledge_base,
+        }
+    )
+
+    # Create LiveKit room
     async with livekit_api.LiveKitAPI(
-        url=settings.LIVEKIT_URL,
+        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     ) as lk:
@@ -191,38 +213,28 @@ async def make_outbound_call(
             CreateRoomRequest(name=room_name, metadata=metadata)
         )
 
-    # Create call record
+    # Save call record
     call = Call(
         id=call_id,
         agent_id=agent.id,
         user_id=user.id,
-        phone_number_id=phone_record.id if phone_record else None,
         direction="outbound",
         status="ringing",
         to_number=to_number,
-        from_number=from_number,
+        from_number=user_settings.twilio_from_number,
         livekit_room=room_name,
     )
     db.add(call)
     await db.commit()
 
-    # Initiate Twilio call
-    livekit_host = settings.LIVEKIT_URL.replace("wss://", "").replace("ws://", "").split("/")[0]
-    sip_uri = f"sip:{settings.LIVEKIT_API_KEY}@{livekit_host}?room={room_name}"
-
-    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-    twilio_call = client.calls.create(
-        to=to_number,
-        from_=from_number,
-        twiml=f'<Response><Dial answerOnBridge="true"><Sip>{sip_uri}</Sip></Dial></Response>',
-        status_callback=f"{settings.API_BASE_URL}/twilio/status",
-        status_callback_method="POST",
+    # Initiate outbound SIP call via LiveKit
+    await make_outbound_sip_call(
+        outbound_trunk_id=user_settings.livekit_outbound_trunk_id,
+        to_number=to_number,
+        room_name=room_name,
     )
 
-    call.twilio_sid = twilio_call.sid
-    await db.commit()
-
-    return {"call_id": str(call_id), "twilio_sid": twilio_call.sid, "status": "ringing"}
+    return {"call_id": str(call_id), "status": "ringing", "room": room_name}
 
 
 @router.get("", response_model=List[CallResponse])

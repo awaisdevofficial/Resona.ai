@@ -12,6 +12,7 @@
 
 from datetime import datetime
 import json
+import os
 import uuid
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -21,6 +22,8 @@ from livekit.protocol.room import CreateRoomRequest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.twiml.voice_response import Dial, VoiceResponse
+
+from app.prompts import get_full_system_prompt
 
 from app.config import settings
 from app.database import get_db
@@ -66,12 +69,14 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     kb_entries = kb_result.scalars().all()
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
+    full_system_prompt = get_full_system_prompt(agent.system_prompt)
     metadata = json.dumps({
-        "system_prompt": agent.system_prompt or "You are a helpful voice AI assistant.",
+        "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "tts_voice_id": agent.tts_voice_id or "Rachel",
-        "silence_timeout": agent.silence_timeout or 30,
-        "max_duration": agent.max_duration or 3600,
+        "tts_provider": agent.tts_provider or "cartesia",
+        "tts_voice_id": agent.tts_voice_id or "aura-asteria-en",
+        "silence_timeout": int(agent.silence_timeout or 30),
+        "max_duration": int(agent.max_duration or 3600),
         "call_id": str(call_id),
         "agent_speaks_first": agent.tools_config.get("agent_speaks_first", True) if agent.tools_config else True,
         "transfer_number": agent.tools_config.get("transfer_number", "") if agent.tools_config else "",
@@ -95,7 +100,7 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Create LiveKit room with metadata
     async with livekit_api.LiveKitAPI(
-        url=settings.LIVEKIT_URL,
+        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     ) as lk:

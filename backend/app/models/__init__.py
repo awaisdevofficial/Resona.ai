@@ -4,7 +4,19 @@ from .call import Call
 from .knowledge_base import KnowledgeBase
 from .phone_number import PhoneNumber
 from .user import User
+from .user_settings import UserSettings
+from .voice_profile import VoiceProfile
 from .webhook import Webhook
 
-__all__ = ["User", "Agent", "Call", "KnowledgeBase", "PhoneNumber", "Webhook", "ApiKey"]
+__all__ = [
+    "User",
+    "Agent",
+    "Call",
+    "KnowledgeBase",
+    "PhoneNumber",
+    "Webhook",
+    "ApiKey",
+    "VoiceProfile",
+    "UserSettings",
+]
 

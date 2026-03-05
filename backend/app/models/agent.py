@@ -33,7 +33,7 @@ class Agent(Base):
     stt_provider = Column(String, default="deepgram")
     stt_model = Column(String, default="nova-2-general")
     stt_language = Column(String, default="en-US")
-    tts_provider = Column(String, default="elevenlabs")
+    tts_provider = Column(String, default="cartesia")
     tts_voice_id = Column(String, nullable=True)
     tts_stability = Column(Float, default=0.5)
     silence_timeout = Column(Integer, default=30)

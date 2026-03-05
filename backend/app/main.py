@@ -10,10 +10,12 @@ from app.routers import (
     api_keys,
     analytics,
     calls,
+    internal_users,
     knowledge_base,
     phone_numbers,
     settings as settings_router,
     twilio_webhook,
+    voices,
     webhooks,
 )
 
@@ -55,6 +57,11 @@ app.include_router(
     tags=["Internal"],
 )
 app.include_router(
+    internal_users.router,
+    prefix="/internal",
+    tags=["Internal"],
+)
+app.include_router(
     phone_numbers.router,
     prefix="/v1/phone-numbers",
     tags=["Phone Numbers"],
@@ -64,6 +71,7 @@ app.include_router(
     prefix="/v1/settings",
     tags=["Settings"],
 )
+app.include_router(voices.router, prefix="/v1/voices", tags=["Voices"])
 app.include_router(twilio_webhook.router, prefix="/twilio", tags=["Twilio"])
 app.include_router(analytics.router, prefix="/v1/analytics", tags=["Analytics"])
 app.include_router(api_keys.router, prefix="/v1/api-keys", tags=["API Keys"])

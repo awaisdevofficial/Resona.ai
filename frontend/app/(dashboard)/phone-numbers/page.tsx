@@ -65,27 +65,28 @@ export default function PhoneNumbersPage() {
     <div className="animate-route-in">
       <PageHeader
         title="Phone Numbers"
-        subtitle="Manage numbers from your Twilio account. Assign an agent to each number."
-        actions={
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => importNumbers.mutate()}
-            disabled={importNumbers.isPending}
-          >
-            <RefreshCw
-              size={14}
-              className={cn("mr-1.5", importNumbers.isPending && "animate-spin")}
-            />
-            {importNumbers.isPending ? "Importing..." : "Import from Twilio"}
-          </Button>
-        }
+        subtitle="Numbers are added automatically when you set up SIP in Settings. Assign an agent to each number."
       />
 
       <div className="bg-info/10 border border-info/20 rounded-card p-5 mb-6 text-body text-info font-medium leading-relaxed">
-        Connect your Twilio account in Settings, then click Import to sync your
-        numbers. Each number can be assigned to one agent — that agent will
-        answer all calls to that number.
+        Your phone number is added automatically when you complete Twilio & SIP
+        setup in Settings. Optionally import additional numbers from Twilio below.
+        Assign an agent to each number — that agent will answer all calls to it.
+      </div>
+
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => importNumbers.mutate()}
+          disabled={importNumbers.isPending}
+        >
+          <RefreshCw
+            size={14}
+            className={cn("mr-1.5", importNumbers.isPending && "animate-spin")}
+          />
+          {importNumbers.isPending ? "Importing..." : "Import from Twilio"}
+        </Button>
       </div>
 
       {isLoading ? (
@@ -101,7 +102,7 @@ export default function PhoneNumbersPage() {
         <div className="bg-surface rounded-card border border-border shadow-card">
           <EmptyState
             title="No phone numbers yet"
-            description="Add your Twilio credentials in Settings, then import your numbers."
+            description="Complete Twilio & SIP setup in Settings — your number will appear here automatically. You can also import numbers from your Twilio account."
             action={{
               label: "Import from Twilio",
               onClick: () => importNumbers.mutate(),

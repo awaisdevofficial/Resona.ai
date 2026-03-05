@@ -2,26 +2,60 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+SUPPORTED_LANGUAGES = {
+    "en-US",
+    "en-GB",
+    "es-ES",
+    "es-US",
+    "fr-FR",
+    "de-DE",
+}
 
 
 class AgentCreate(BaseModel):
     name: str
     description: Optional[str] = None
     system_prompt: str
-    first_message: Optional[str] = "Hello, how can I help you today?"
+    first_message: str
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(0.7, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(500, ge=50, le=4000)
     stt_provider: str = "deepgram"
     stt_model: str = "nova-2-general"
     stt_language: str = "en-US"
-    tts_provider: str = "elevenlabs"
+    tts_provider: str = "cartesia"
     tts_voice_id: Optional[str] = None
     tts_stability: float = Field(0.5, ge=0.0, le=1.0)
     silence_timeout: int = Field(30, ge=5, le=300)
     max_duration: int = Field(3600, ge=60, le=14400)
     tools_config: dict[str, Any] = {}
+
+    @field_validator("name")
+    @classmethod
+    def name_required(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Agent name is required")
+        return v.strip()
+
+    @field_validator("first_message")
+    @classmethod
+    def first_message_required(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("First message is required")
+        return v.strip()
+
+    @field_validator("stt_language")
+    @classmethod
+    def validate_language(cls, v: str) -> str:
+        if not v:
+            return "en-US"
+        v = v.strip()
+        if v not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language '{v}'. Supported: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
+        return v
 
 
 class AgentUpdate(BaseModel):

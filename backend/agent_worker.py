@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import logging
@@ -7,6 +6,8 @@ import time
 from datetime import datetime
 
 from dotenv import load_dotenv
+
+from app.prompts import get_full_system_prompt
 import httpx
 from livekit.agents import (
     AutoSubscribe,
@@ -18,7 +19,7 @@ from livekit.agents import (
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
-from livekit.plugins import deepgram, elevenlabs, silero, groq
+from livekit.plugins import cartesia, deepgram, silero, groq
 
 load_dotenv()
 
@@ -45,6 +46,19 @@ def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
 
+def _cartesia_language_from_stt(stt_language: str | None) -> str:
+    """
+    Map STT language codes (e.g. en-US, es-ES) to Cartesia language identifiers.
+    Defaults safely to English.
+    """
+    if not stt_language:
+        return "en"
+    base = (stt_language or "").split("-")[0].lower()
+    if base in {"en", "es", "fr", "de"}:
+        return base
+    return "en"
+
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -56,50 +70,82 @@ async def entrypoint(ctx: JobContext):
         if metadata:
             agent_config = json.loads(metadata)
     except Exception:
-        pass
+        agent_config = {}
 
-    system_prompt = agent_config.get(
+    # If no metadata was provided, this is likely an inbound SIP call where
+    # the room was created by a dispatch rule using the `sip-{user_id}-*` prefix.
+    if not agent_config:
+        room_name = ctx.room.name or ""
+        parts = room_name.split("-")
+        user_id = parts[1] if len(parts) > 1 else None
+
+        if user_id:
+            try:
+                api_base = os.environ.get("API_BASE_URL", "http://localhost:8000")
+                internal_secret = os.environ.get("INTERNAL_SECRET", "")
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.get(
+                        f"{api_base}/internal/users/{user_id}/default-agent",
+                        headers={"X-Internal-Secret": internal_secret},
+                    )
+                if resp.status_code == 200:
+                    agent_config = resp.json()
+                else:
+                    agent_config = {}
+            except Exception as e:
+                logger.warning(f"Failed to fetch default agent config for user {user_id}: {e}")
+
+        if not agent_config:
+            # Fallback config if we couldn't resolve a user/agent
+            agent_config = {
+                "system_prompt": "You are a helpful voice AI assistant.",
+                "first_message": "Hi, how can I help you today?",
+                "tts_provider": "deepgram",
+                "tts_voice_id": "aura-asteria-en",
+            }
+
+    base_system_prompt = agent_config.get(
         "system_prompt",
         "You are a helpful, friendly voice AI assistant. Keep responses short and conversational.",
     )
     kb_content = agent_config.get("knowledge_base", "")
     if kb_content:
-        system_prompt = (
-            system_prompt
+        base_system_prompt = (
+            base_system_prompt
             + "\n\n=== KNOWLEDGE BASE ===\n"
             + kb_content
             + "\n=== END KNOWLEDGE BASE ==="
         )
+    # Prepend human-behavior instructions (metadata may already include them; avoid duplicate)
+    if base_system_prompt.strip().startswith("Speak exactly like a real human"):
+        system_prompt = base_system_prompt
+    else:
+        system_prompt = get_full_system_prompt(base_system_prompt)
     first_message = agent_config.get("first_message", "Hi, how can I help you today?")
-    VOICE_NAME_TO_ID = {
-        "Rachel": "21m00Tcm4TlvDq8ikWAM",
-        "Drew": "29vD33N1vc5IkxM6UTqy",
-        "Clyde": "2EiwWnXFnvU5JabPnv8n",
-        "Paul": "5Q0t7uMcjvnagumLfvZi",
-        "Domi": "AZnzlk1XvdvUeBnXmlld",
-        "Dave": "CYw3kZ78EhJOlQCFuako",
-        "Fin": "D38z5RcWu1voky8WS1ja",
-        "Bella": "EXAVITQu4vr4xnSDxMaL",
-        "Antoni": "ErXwobaYiN019PkySvjV",
-        "Thomas": "GBv7mTt0atIp3Br8iCZE",
-        "Charlie": "IKne3meq5aSn9XLyUdCD",
-        "Emily": "LcfcDJNUP1GQjkzn1xUU",
-        "Elli": "MF3mGyEYCl7XYWbV9V6O",
-        "Callum": "N2lVS1w4EtoT3dr4eOWO",
-        "Patrick": "ODq5zmih8GrVes37Dy9p",
-        "Harry": "SOYHLrjzK2X1ezoPC6cr",
-        "Liam": "TX3LPaxmHKxFdv7VOQHJ",
-        "Dorothy": "ThT5KcBeYPX3keUQqHPh",
-        "Josh": "TxGEqnHWrfWFTfGW9XjX",
-        "Arnold": "VR6AewLTigWG4xSOukaG",
-        "Charlotte": "XB0fDUnXU5powFXDhCwa",
-        "Alice": "Xb7hH8MSUJpSbSDYk0k2",
-        "Matilda": "XrExE9yKIg1WjnnlVkGX",
-        "James": "ZQe5CZNOzWyzPSCn5a3c",
-        "Joseph": "Zlb1dXrM653N07WRdFW3",
-    }
-    voice_name = agent_config.get("tts_voice_id", "Josh")
-    voice_id = VOICE_NAME_TO_ID.get(voice_name, "TxGEqnHWrfWFTfGW9XjX")
+
+    # Determine TTS/STT configuration from metadata
+    stt_language = agent_config.get("stt_language", "en-US")
+
+    # Determine TTS provider & voice id
+    tts_provider = (agent_config.get("tts_provider") or "").lower()
+    tts_voice_id = agent_config.get("tts_voice_id")
+
+    # Default preference: Cartesia → Deepgram, depending on environment
+    if not tts_provider:
+        if os.environ.get("CARTESIA_API_KEY"):
+            tts_provider = "cartesia"
+        else:
+            tts_provider = "deepgram"
+
+    if tts_provider == "deepgram":
+        # Deepgram Aura models – default to asteria if unset
+        if not tts_voice_id:
+            tts_voice_id = "aura-asteria-en"
+    else:
+        # Cartesia or any future providers: use given id or fallback
+        if not tts_voice_id:
+            # Let Cartesia fall back to its default voice when id is missing
+            tts_voice_id = "default"
 
     # Track transcript lines and call duration
     transcript_lines: list[dict] = []
@@ -114,20 +160,45 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
+    # Shared STT / LLM configuration
+    stt = deepgram.STT(
+        model="nova-2-general",
+        api_key=os.environ.get("DEEPGRAM_API_KEY"),
+    )
+    llm = groq.LLM(
+        model="llama-3.3-70b-versatile",
+        api_key=os.environ.get("GROQ_API_KEY"),
+    )
+
+    # Choose TTS implementation based on provider
+    if tts_provider == "cartesia":
+        tts = cartesia.TTS(
+            api_key=os.environ.get("CARTESIA_API_KEY"),
+            voice=tts_voice_id,
+            model="sonic-3",
+            language=_cartesia_language_from_stt(stt_language),
+        )
+    elif tts_provider == "deepgram":
+        from livekit.plugins import deepgram as dg_plugins
+
+        tts = dg_plugins.TTS(
+            model=tts_voice_id,
+            api_key=os.environ.get("DEEPGRAM_API_KEY"),
+        )
+    else:
+        # Fallback to Cartesia if provider is unknown
+        tts = cartesia.TTS(
+            api_key=os.environ.get("CARTESIA_API_KEY"),
+            voice=tts_voice_id,
+            model="sonic-3",
+            language="en",
+        )
+
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
-        stt=deepgram.STT(
-            model="nova-2-general",
-            api_key=os.environ.get("DEEPGRAM_API_KEY"),
-        ),
-        llm=groq.LLM(
-            model="llama-3.3-70b-versatile",
-            api_key=os.environ.get("GROQ_API_KEY"),
-        ),
-        tts=elevenlabs.TTS(
-            voice_id=voice_id,
-            api_key=os.environ.get("ELEVENLABS_API_KEY"),
-        ),
+        stt=stt,
+        llm=llm,
+        tts=tts,
     )
 
     @session.on("user_input_transcribed")
