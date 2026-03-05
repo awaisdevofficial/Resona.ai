@@ -80,12 +80,6 @@ export function TestCallPanel({
     lastDurationRef.current = duration
   }, [duration])
 
-  useEffect(() => {
-    if (!open) {
-      hangUp()
-    }
-  }, [open])
-
   const sendTranscriptToServer = useCallback(
     (role: "user" | "agent", text: string) => {
       const callId = callIdRef.current
@@ -247,7 +241,7 @@ export function TestCallPanel({
     }
   }
 
-  function cleanupRoom() {
+  const cleanupRoom = useCallback(() => {
     if (roomRef.current) {
       roomRef.current.disconnect()
       roomRef.current = null
@@ -256,13 +250,19 @@ export function TestCallPanel({
       audioRef.current.remove()
       audioRef.current = null
     }
-  }
+  }, [])
 
-  async function hangUp() {
+  const hangUp = useCallback(async () => {
     cleanupRoom()
     setCallState("ended")
     completeCallOnServer()
-  }
+  }, [cleanupRoom, completeCallOnServer])
+
+  useEffect(() => {
+    if (!open) {
+      hangUp()
+    }
+  }, [open, hangUp])
 
   async function toggleMute() {
     if (!roomRef.current) return

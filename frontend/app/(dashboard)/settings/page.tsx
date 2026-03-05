@@ -403,13 +403,11 @@ function SipSetupWizard() {
     },
   })
 
-  const defaultOriginationUri =
-    process.env.NEXT_PUBLIC_ORIGINATION_URI ??
-    "sip:resona_key@resona.duckdns.org:5060"
-  const livekitSipUri =
-    status?.livekit_sip_uri ?? defaultOriginationUri.replace(/:5060$/, "")
+  // Always use this for the Twilio Origination tab (Priority 1, Weight 1) — do not use API value so the UI stays correct.
   const originationUri =
-    status?.origination_uri ?? defaultOriginationUri
+    process.env.NEXT_PUBLIC_ORIGINATION_URI ??
+    "sip:resona_key@18.141.140.150:5060"
+  const livekitSipUri = originationUri.replace(/:5060$/, "")
 
   return (
     <div className="bg-surface border border-border rounded-xl shadow-card p-6">

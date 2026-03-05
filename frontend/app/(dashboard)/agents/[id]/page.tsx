@@ -97,7 +97,7 @@ export default function AgentEditPage({
         transfer_number: agent.tools_config?.transfer_number ?? "",
       })
     }
-  }, [agent])
+  }, [agent, form])
 
   const watchedName = form.watch("name")
   const watchedFirstMessage = form.watch("first_message")
