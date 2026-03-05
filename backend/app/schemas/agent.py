@@ -15,11 +15,16 @@ SUPPORTED_LANGUAGES = {
 }
 
 
+# Limits to keep LiveKit token (and request URL) size safe
+MAX_SYSTEM_PROMPT_LEN = 8000
+MAX_FIRST_MESSAGE_LEN = 500
+
+
 class AgentCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    system_prompt: str
-    first_message: str
+    system_prompt: str = Field(..., min_length=1, max_length=MAX_SYSTEM_PROMPT_LEN)
+    first_message: str = Field(..., min_length=1, max_length=MAX_FIRST_MESSAGE_LEN)
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(0.7, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(500, ge=50, le=4000)
@@ -40,12 +45,21 @@ class AgentCreate(BaseModel):
             raise ValueError("Agent name is required")
         return v.strip()
 
+    @field_validator("system_prompt")
+    @classmethod
+    def system_prompt_required(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("System prompt is required")
+        return v
+
     @field_validator("first_message")
     @classmethod
     def first_message_required(cls, v: str) -> str:
-        if not v or not v.strip():
+        v = (v or "").strip()
+        if not v:
             raise ValueError("First message is required")
-        return v.strip()
+        return v
 
     @field_validator("stt_language")
     @classmethod
@@ -61,8 +75,8 @@ class AgentCreate(BaseModel):
 class AgentUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    system_prompt: Optional[str] = None
-    first_message: Optional[str] = None
+    system_prompt: Optional[str] = Field(None, max_length=MAX_SYSTEM_PROMPT_LEN)
+    first_message: Optional[str] = Field(None, max_length=MAX_FIRST_MESSAGE_LEN)
     llm_model: Optional[str] = None
     llm_temperature: Optional[float] = None
     llm_max_tokens: Optional[int] = None

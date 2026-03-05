@@ -10,6 +10,7 @@ import toast from "react-hot-toast"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { TestCallPanel } from "@/components/agents/TestCallPanel"
 import { api, API_BASE_URL, getAuthToken } from "@/lib/api"
+import { MAX_FIRST_MESSAGE_LEN, MAX_SYSTEM_PROMPT_LEN } from "@/lib/agentLimits"
 import { cn } from "@/components/lib-utils"
 import { VoiceLibrary, Voice } from "@/components/agents/VoiceLibrary"
 
@@ -321,10 +322,18 @@ export default function AgentEditPage({
                     <textarea
                       {...form.register("system_prompt", {
                         required: "System prompt is required",
+                        maxLength: {
+                          value: MAX_SYSTEM_PROMPT_LEN,
+                          message: `Max ${MAX_SYSTEM_PROMPT_LEN} characters (keeps test-call URL safe)`,
+                        },
                       })}
+                      maxLength={MAX_SYSTEM_PROMPT_LEN}
                       rows={4}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60 resize-none"
                     />
+                    <p className="text-[11px] text-[#6B7280]">
+                      {form.watch("system_prompt")?.length ?? 0} / {MAX_SYSTEM_PROMPT_LEN}
+                    </p>
                     {form.formState.errors.system_prompt && (
                       <p className="text-[11px] text-red-500 mt-0.5">
                         {form.formState.errors.system_prompt.message}
@@ -339,9 +348,17 @@ export default function AgentEditPage({
                       type="text"
                       {...form.register("first_message", {
                         required: "First message is required",
+                        maxLength: {
+                          value: MAX_FIRST_MESSAGE_LEN,
+                          message: `Max ${MAX_FIRST_MESSAGE_LEN} characters`,
+                        },
                       })}
+                      maxLength={MAX_FIRST_MESSAGE_LEN}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/60"
                     />
+                    <p className="text-[11px] text-[#6B7280]">
+                      {form.watch("first_message")?.length ?? 0} / {MAX_FIRST_MESSAGE_LEN}
+                    </p>
                     {form.formState.errors.first_message && (
                       <p className="text-[11px] text-red-500 mt-0.5">
                         {form.formState.errors.first_message.message}

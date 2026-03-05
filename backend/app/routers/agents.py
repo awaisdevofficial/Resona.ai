@@ -179,6 +179,12 @@ async def create_web_call_token(
             voice_id = "default"
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
+    max_prompt = getattr(settings, "MAX_SYSTEM_PROMPT_LEN", 8000)
+    max_first = getattr(settings, "MAX_FIRST_MESSAGE_LEN", 500)
+    max_kb = getattr(settings, "MAX_KNOWLEDGE_BASE_LEN_FOR_TOKEN", 4000)
+    system_prompt_for_token = full_system_prompt[:max_prompt] if len(full_system_prompt) > max_prompt else full_system_prompt
+    first_message_for_token = (agent.first_message or "")[:max_first]
+
     metadata_dict = {
         "type": "web_test",
         "test_title": f"Test call – {agent.name}",
@@ -186,8 +192,8 @@ async def create_web_call_token(
         "agent_name": agent.name,
         "user_id": str(user.id),
         "user_email": user.email,
-        "system_prompt": full_system_prompt,
-        "first_message": agent.first_message,
+        "system_prompt": system_prompt_for_token,
+        "first_message": first_message_for_token,
         "llm_model": agent.llm_model or "gpt-4o-mini",
         "llm_temperature": agent.llm_temperature or 0.7,
         "llm_max_tokens": agent.llm_max_tokens or 500,
@@ -208,8 +214,8 @@ async def create_web_call_token(
         select(KnowledgeBase).where(KnowledgeBase.agent_id == agent.id)
     )
     kb_entries = kb_result.scalars().all()
-    knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
-    metadata_dict["knowledge_base"] = knowledge_base
+    knowledge_base_raw = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
+    metadata_dict["knowledge_base"] = knowledge_base_raw[:max_kb] if len(knowledge_base_raw) > max_kb else knowledge_base_raw
 
     # Create Call record so web test calls are persisted
     call = Call(
@@ -235,8 +241,9 @@ async def create_web_call_token(
         .to_jwt()
     )
 
+    api_url = settings.LIVEKIT_API_URL or "http://127.0.0.1:7880"
     async with LiveKitAPI(
-        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
+        url=api_url,
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     ) as lk:

@@ -58,6 +58,11 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str
 
+    # Agent prompt limits (keep JWT token URL safe; ~2k–8k URL limit in browsers)
+    MAX_SYSTEM_PROMPT_LEN: int = 8000
+    MAX_FIRST_MESSAGE_LEN: int = 500
+    MAX_KNOWLEDGE_BASE_LEN_FOR_TOKEN: int = 4000
+
     @field_validator("API_BASE_URL", "FRONTEND_URL", mode="after")
     @classmethod
     def normalize_url(cls, v: str) -> str:
