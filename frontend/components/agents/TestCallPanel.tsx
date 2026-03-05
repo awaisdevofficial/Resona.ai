@@ -215,9 +215,6 @@ export function TestCallPanel({
       )
 
       room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
-        if (state === ConnectionState.Connected) {
-          setCallState("connected")
-        }
         if (state === ConnectionState.Disconnected) {
           setCallState("ended")
           completeCallOnServer()
@@ -236,7 +233,6 @@ export function TestCallPanel({
       for (const track of tracks) {
         await room.localParticipant.publishTrack(track)
       }
-
       setCallState("connected")
     } catch (err) {
       console.error(err)

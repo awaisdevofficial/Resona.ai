@@ -66,9 +66,11 @@ DEEPGRAM_TTS_MODEL_MAP = {
 
 
 async def entrypoint(ctx: JobContext):
+    logger.info("Agent job started room=%s", ctx.room.name)
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
+    logger.info("Participant joined room=%s identity=%s", ctx.room.name, participant.identity)
 
     agent_config: dict = {}
     try:
@@ -158,6 +160,9 @@ async def entrypoint(ctx: JobContext):
         raise RuntimeError(
             "DEEPGRAM_API_KEY is required for STT and TTS. Set it in the environment."
         )
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not groq_key:
+        logger.warning("GROQ_API_KEY is not set; LLM calls will fail.")
 
     # Low-latency STT: interim results and short endpointing so barge-in works quickly
     stt = deepgram.STT(
@@ -251,18 +256,28 @@ async def entrypoint(ctx: JobContext):
         return transfer_call
 
     transfer_tool = make_transfer_tool(ctx.room)
-    # Deepgram STT expects 16 kHz; set room input to 16 kHz so user voice reaches STT correctly.
-    await session.start(
-        agent=Agent(instructions=system_prompt, tools=[transfer_tool]),
-        room=ctx.room,
-        room_input_options=voice_room_io.RoomInputOptions(audio_sample_rate=16000),
+    logger.info(
+        "Starting voice session room=%s agent_speaks_first=%s",
+        ctx.room.name,
+        agent_config.get("agent_speaks_first", True),
     )
+    # Deepgram STT expects 16 kHz; set room input to 16 kHz so user voice reaches STT correctly.
+    try:
+        await session.start(
+            agent=Agent(instructions=system_prompt, tools=[transfer_tool]),
+            room=ctx.room,
+            room_input_options=voice_room_io.RoomInputOptions(audio_sample_rate=16000),
+        )
+    except Exception as e:
+        logger.exception("session.start() failed: %s", e)
+        raise
 
     agent_speaks_first = agent_config.get("agent_speaks_first", True)
     say_text = (first_message or "Hi, how can I help you today?").strip()
     if agent_speaks_first and say_text:
         try:
             await session.say(say_text, allow_interruptions=True)
+            logger.info("First message sent: %s", say_text[:50] + ("..." if len(say_text) > 50 else ""))
         except Exception as e:
             logger.exception("Agent TTS/say failed: %s", e)
 
