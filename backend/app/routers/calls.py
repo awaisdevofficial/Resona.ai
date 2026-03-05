@@ -171,8 +171,8 @@ async def make_outbound_call(
     kb_entries = kb_result.scalars().all()
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
-    # Cartesia only for TTS
-    voice_id = agent.tts_voice_id or "default"
+    # Deepgram Aura 2 TTS
+    voice_id = agent.tts_voice_id or "aura-2-andromeda-en"
 
     # Create room with metadata
     room_name = f"sip-{user.id}-{uuid.uuid4()}"
@@ -185,8 +185,8 @@ async def make_outbound_call(
             "first_message": agent.first_message
             or "Hi, how can I help you today?",
             "tts_voice_id": voice_id,
-            "tts_provider": "cartesia",
-            "stt_model": agent.stt_model or "ink-whisper",
+            "tts_provider": "deepgram",
+            "stt_model": agent.stt_model or "nova-2-general",
             "stt_language": agent.stt_language or "en-US",
             "silence_timeout": int(agent.silence_timeout or 30),
             "max_duration": int(agent.max_duration or 3600),

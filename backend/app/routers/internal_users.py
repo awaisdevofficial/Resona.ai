@@ -33,12 +33,14 @@ async def get_default_agent_config(
 
     await db.refresh(agent)
 
-    # Minimal config required by the agent worker; can be extended as needed
+    # Minimal config required by the agent worker (STT + TTS + prompts)
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
     return {
         "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "tts_provider": agent.tts_provider or "cartesia",
-        "tts_voice_id": agent.tts_voice_id or "default",
+        "tts_provider": agent.tts_provider or "deepgram",
+        "tts_voice_id": agent.tts_voice_id or "aura-2-andromeda-en",
+        "stt_model": agent.stt_model or "nova-2-general",
+        "stt_language": agent.stt_language or "en-US",
     }
 

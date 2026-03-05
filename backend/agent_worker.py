@@ -19,7 +19,8 @@ from livekit.agents import (
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
-from livekit.plugins import cartesia, silero, groq
+from livekit.agents.voice import room_io as voice_room_io
+from livekit.plugins import deepgram, silero, groq
 
 load_dotenv()
 
@@ -46,17 +47,22 @@ def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
 
-def _cartesia_language_from_stt(stt_language: str | None) -> str:
-    """
-    Map STT language codes (e.g. en-US, es-ES) to Cartesia language identifiers.
-    Defaults safely to English.
-    """
-    if not stt_language:
-        return "en"
-    base = (stt_language or "").split("-")[0].lower()
-    if base in {"en", "es", "fr", "de"}:
-        return base
-    return "en"
+# Map legacy Aura 1 / display names to Deepgram Aura 2 model names
+DEEPGRAM_TTS_MODEL_MAP = {
+    "aura-asteria-en": "aura-2-andromeda-en",
+    "aura-luna-en": "aura-2-athena-en",
+    "aura-stella-en": "aura-2-athena-en",
+    "aura-athena-en": "aura-2-athena-en",
+    "aura-hera-en": "aura-2-athena-en",
+    "aura-orion-en": "aura-2-andromeda-en",
+    "aura-arcas-en": "aura-2-andromeda-en",
+    "aura-perseus-en": "aura-2-orion-en",
+    "aura-angus-en": "aura-2-orion-en",
+    "aura-orpheus-en": "aura-2-orion-en",
+    "aura-helios-en": "aura-2-orion-en",
+    "aura-zeus-en": "aura-2-orion-en",
+    "default": "aura-2-andromeda-en",
+}
 
 
 async def entrypoint(ctx: JobContext):
@@ -100,8 +106,8 @@ async def entrypoint(ctx: JobContext):
             agent_config = {
                 "system_prompt": "You are a helpful voice AI assistant.",
                 "first_message": "Hi, how can I help you today?",
-                "tts_provider": "cartesia",
-                "tts_voice_id": "default",
+                "tts_provider": "deepgram",
+                "tts_voice_id": "aura-2-andromeda-en",
             }
 
     base_system_prompt = agent_config.get(
@@ -125,9 +131,13 @@ async def entrypoint(ctx: JobContext):
 
     # Determine TTS/STT configuration from metadata
     stt_language = agent_config.get("stt_language", "en-US")
+    stt_model = agent_config.get("stt_model") or "nova-2-general"
 
-    # TTS: Cartesia only
-    tts_voice_id = agent_config.get("tts_voice_id") or "default"
+    # TTS: Deepgram Aura 2; map legacy voice ids to Aura 2 model names
+    tts_voice_id = agent_config.get("tts_voice_id") or "aura-2-andromeda-en"
+    tts_model = DEEPGRAM_TTS_MODEL_MAP.get(tts_voice_id) or (
+        tts_voice_id if str(tts_voice_id).startswith("aura-2-") else "aura-2-andromeda-en"
+    )
 
     # Track transcript lines and call duration
     transcript_lines: list[dict] = []
@@ -142,28 +152,26 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
-    # STT + LLM + TTS: Cartesia for STT and TTS, Groq for LLM
-    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
-    if not cartesia_key:
+    # STT + LLM + TTS: Deepgram for STT and TTS, Groq for LLM
+    deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "").strip()
+    if not deepgram_key:
         raise RuntimeError(
-            "CARTESIA_API_KEY is required for STT and TTS. Set it in the environment."
+            "DEEPGRAM_API_KEY is required for STT and TTS. Set it in the environment."
         )
 
-    stt_model = agent_config.get("stt_model") or "ink-whisper"
-    stt = cartesia.STT(
+    stt = deepgram.STT(
         model=stt_model,
-        api_key=cartesia_key,
-        language=_cartesia_language_from_stt(stt_language),
+        api_key=deepgram_key,
+        language=stt_language or "en-US",
+        sample_rate=16000,
     )
     llm = groq.LLM(
         model="llama-3.3-70b-versatile",
         api_key=os.environ.get("GROQ_API_KEY"),
     )
-    tts = cartesia.TTS(
-        api_key=cartesia_key,
-        voice=tts_voice_id,
-        model="sonic-3",
-        language=_cartesia_language_from_stt(stt_language),
+    tts = deepgram.TTS(
+        model=tts_model,
+        api_key=deepgram_key,
     )
 
     session = AgentSession(
@@ -231,9 +239,11 @@ async def entrypoint(ctx: JobContext):
         return transfer_call
 
     transfer_tool = make_transfer_tool(ctx.room)
+    # Deepgram STT expects 16 kHz; set room input to 16 kHz so user voice reaches STT correctly.
     await session.start(
         agent=Agent(instructions=system_prompt, tools=[transfer_tool]),
         room=ctx.room,
+        room_input_options=voice_room_io.RoomInputOptions(audio_sample_rate=16000),
     )
 
     agent_speaks_first = agent_config.get("agent_speaks_first", True)

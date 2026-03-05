@@ -18,10 +18,10 @@ const FIXED_DEFAULTS = {
   llm_model: "gpt-4o-mini",
   llm_temperature: 0.7,
   llm_max_tokens: 500,
-  stt_provider: "cartesia",
-  stt_model: "ink-whisper",
+  stt_provider: "deepgram",
+  stt_model: "nova-2-general",
   stt_language: "en-US",
-  tts_provider: "cartesia",
+  tts_provider: "deepgram",
   tts_stability: 0.5,
 }
 
@@ -63,7 +63,7 @@ export default function NewAgentPage() {
         "You are a helpful, friendly voice AI agent that assists callers with their questions.",
       first_message: "Hi, this is your AI assistant. How can I help you today?",
       tts_voice_id: "",
-      tts_provider: "cartesia",
+      tts_provider: "deepgram",
       stt_language: "en-US",
       silence_timeout: 30,
       max_duration: 3600,
@@ -115,7 +115,7 @@ export default function NewAgentPage() {
         },
         body: JSON.stringify({
           voice_id: form.getValues("tts_voice_id"),
-          provider: form.getValues("tts_provider") || "cartesia",
+          provider: form.getValues("tts_provider") || "deepgram",
           text:
             "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
@@ -311,7 +311,7 @@ export default function NewAgentPage() {
                         {displayVoice || "Cartesia default voice"}
                       </p>
                       <p className="text-[11px] text-[#9CA3AF]">
-                        Provider: {(watchedProvider || "cartesia").toUpperCase()}
+                        Provider: {(watchedProvider || "deepgram").toUpperCase()}
                       </p>
                     </div>
                   </div>
@@ -520,7 +520,7 @@ export default function NewAgentPage() {
         open={voiceLibraryOpen}
         onClose={() => setVoiceLibraryOpen(false)}
         selectedVoiceId={watchedVoice}
-        selectedProvider={watchedProvider || "cartesia"}
+        selectedProvider={watchedProvider || "deepgram"}
         onSelect={(voice: Voice) => {
           form.setValue("tts_voice_id", voice.id)
           form.setValue("tts_provider", voice.provider)

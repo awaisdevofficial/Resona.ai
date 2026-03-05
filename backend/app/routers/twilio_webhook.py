@@ -74,9 +74,9 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     metadata = json.dumps({
         "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "tts_provider": "cartesia",
-        "tts_voice_id": agent.tts_voice_id or "default",
-        "stt_model": agent.stt_model or "ink-whisper",
+        "tts_provider": "deepgram",
+        "tts_voice_id": agent.tts_voice_id or "aura-2-andromeda-en",
+        "stt_model": agent.stt_model or "nova-2-general",
         "stt_language": agent.stt_language or "en-US",
         "silence_timeout": int(agent.silence_timeout or 30),
         "max_duration": int(agent.max_duration or 3600),

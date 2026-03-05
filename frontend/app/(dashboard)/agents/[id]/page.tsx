@@ -18,10 +18,10 @@ const FIXED_DEFAULTS = {
   llm_model: "gpt-4o-mini",
   llm_temperature: 0.7,
   llm_max_tokens: 500,
-  stt_provider: "cartesia",
-  stt_model: "ink-whisper",
+  stt_provider: "deepgram",
+  stt_model: "nova-2-general",
   stt_language: "en-US",
-  tts_provider: "cartesia",
+  tts_provider: "deepgram",
   tts_stability: 0.5,
 }
 
@@ -73,7 +73,7 @@ export default function AgentEditPage({
       system_prompt: "",
       first_message: "",
       tts_voice_id: "",
-      tts_provider: "cartesia",
+      tts_provider: "deepgram",
       stt_language: "en-US",
       silence_timeout: 30,
       max_duration: 3600,
@@ -90,7 +90,7 @@ export default function AgentEditPage({
         system_prompt: agent.system_prompt || "",
         first_message: agent.first_message || "",
         tts_voice_id: agent.tts_voice_id || "",
-        tts_provider: agent.tts_provider || "cartesia",
+        tts_provider: agent.tts_provider || "deepgram",
         stt_language: agent.stt_language || "en-US",
         silence_timeout: agent.silence_timeout || 30,
         max_duration: agent.max_duration || 3600,
@@ -128,7 +128,7 @@ export default function AgentEditPage({
         system_prompt: updatedAgent.system_prompt || "",
         first_message: updatedAgent.first_message || "",
         tts_voice_id: updatedAgent.tts_voice_id || "",
-        tts_provider: updatedAgent.tts_provider || "cartesia",
+        tts_provider: updatedAgent.tts_provider || "deepgram",
         silence_timeout: updatedAgent.silence_timeout || 30,
         max_duration: updatedAgent.max_duration || 3600,
         agent_speaks_first:
@@ -157,7 +157,7 @@ export default function AgentEditPage({
         },
         body: JSON.stringify({
           voice_id: form.getValues("tts_voice_id") || agent.tts_voice_id,
-          provider: form.getValues("tts_provider") || agent.tts_provider || "cartesia",
+          provider: form.getValues("tts_provider") || agent.tts_provider || "deepgram",
           text:
             "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
@@ -418,7 +418,7 @@ export default function AgentEditPage({
                           {displayVoice || "Cartesia default voice"}
                         </p>
                         <p className="text-[11px] text-[#9CA3AF]">
-                          Provider: {(watchedProvider || agent.tts_provider || "cartesia").toUpperCase()}
+                          Provider: {(watchedProvider || agent.tts_provider || "deepgram").toUpperCase()}
                         </p>
                       </div>
                     </div>

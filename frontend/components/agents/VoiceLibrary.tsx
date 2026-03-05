@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button"
 import { api, API_BASE_URL, getAuthToken } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
 
-export type VoiceProvider = "cartesia" | "chatterbox"
+export type VoiceProvider = "deepgram" | "chatterbox"
 
 export interface Voice {
   id: string
@@ -346,7 +346,7 @@ function CloneVoiceSection() {
       formData.append("name", name.trim())
       formData.append("file", file)
 
-      const res = await fetch(`${API_BASE_URL}/v1/voices/clone/cartesia`, {
+      const res = await fetch(`${API_BASE_URL}/v1/voices/clone/chatterbox`, {
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -374,7 +374,7 @@ function CloneVoiceSection() {
           </p>
         </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-          Cartesia cloning
+          Chatterbox (offline)
         </span>
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
@@ -416,7 +416,7 @@ function initials(name: string) {
 
 function providerLabel(provider: string) {
   const id = provider.toLowerCase()
-  if (id === "cartesia") return "Cartesia"
+  if (id === "deepgram") return "Deepgram Aura"
   if (id === "chatterbox") return "Chatterbox (offline)"
   return provider
 }

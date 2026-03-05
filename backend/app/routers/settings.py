@@ -119,16 +119,16 @@ async def get_tts_settings(
     This is deployment-wide configuration (from environment variables),
     not per-user API keys.
     """
-    cartesia_configured = bool(settings.CARTESIA_API_KEY)
-    default_provider = "cartesia" if cartesia_configured else "cartesia"
+    deepgram_configured = bool(settings.DEEPGRAM_API_KEY)
+    default_provider = "deepgram" if deepgram_configured else "deepgram"
 
     providers = [
         TTSProviderStatus(
-            id="cartesia",
-            label="Cartesia",
-            configured=cartesia_configured,
+            id="deepgram",
+            label="Deepgram Aura",
+            configured=deepgram_configured,
             recommended=True,
-            cost_display="~$0.008 / min (STT + TTS)",
+            cost_display="STT + TTS (usage-based)",
         ),
     ]
 
