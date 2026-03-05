@@ -178,18 +178,19 @@ async def entrypoint(ctx: JobContext):
         api_key=deepgram_key,
     )
 
-    # Barge-in: interrupt as soon as you start speaking (0.05s), use VAD for fast detection.
-    # min_interruption_words=0 so any speech interrupts; min_endpointing_delay=0.3 for quicker turn-taking.
+    # Barge-in: interrupt as soon as you start speaking. aec_warmup_duration=0 so we don't block
+    # interruptions for the first 3 seconds (default); min_interruption_duration=0 for instant interrupt.
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
         llm=llm,
         tts=tts,
         turn_detection="vad",
-        min_interruption_duration=0.05,
+        min_interruption_duration=0.0,
         min_interruption_words=0,
         min_endpointing_delay=0.3,
         max_endpointing_delay=2.0,
+        aec_warmup_duration=0,
     )
 
     @session.on("user_input_transcribed")
