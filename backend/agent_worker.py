@@ -174,11 +174,15 @@ async def entrypoint(ctx: JobContext):
         api_key=deepgram_key,
     )
 
+    # Shorter min_interruption_duration so the agent stops when you start speaking (default 0.5s).
+    # turn_detection="vad" uses VAD to detect speech start/end for faster interrupt response.
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
         llm=llm,
         tts=tts,
+        turn_detection="vad",
+        min_interruption_duration=0.2,
     )
 
     @session.on("user_input_transcribed")
