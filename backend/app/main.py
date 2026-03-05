@@ -28,22 +28,27 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
 app = FastAPI(title="Resona.ai API", version="1.0.0", lifespan=lifespan)
 
-# CORS configuration – keep production domain locked down but
-# be generous for local/dev origins to avoid failing preflight
-cors_origins = {
-    "https://resona.ai",
-    settings.FRONTEND_URL,
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-}
+# CORS configuration – FRONTEND_URL + CORS_ORIGINS (comma-separated) + dev defaults
+def _cors_origins() -> list[str]:
+    origins = {
+        settings.FRONTEND_URL,
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    if settings.CORS_ORIGINS:
+        for o in settings.CORS_ORIGINS.split(","):
+            o = o.strip()
+            if o:
+                origins.add(o)
+    return list(origins)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(cors_origins),
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

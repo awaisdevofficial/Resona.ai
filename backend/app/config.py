@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     DEV_MODE: bool = True
     API_BASE_URL: str = "http://localhost:3000"
     FRONTEND_URL: str = "http://localhost:8080"
+    # Comma-separated extra CORS origins (e.g. "https://resona.ai,https://resonaai.com")
+    CORS_ORIGINS: str = ""
     SECRET_KEY: str
 
 
