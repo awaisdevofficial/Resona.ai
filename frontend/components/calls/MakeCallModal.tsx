@@ -69,8 +69,14 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
       setToNumber("");
       onClose();
     },
-    onError: (err: any) =>
-      toast.error(err?.message || "Failed to start call"),
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.detail ??
+        (typeof err?.response?.data === "string" ? err.response.data : null) ??
+        err?.message ??
+        "Failed to start call";
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    },
   });
 
   const makeOutboundCall = useMutation({
@@ -86,8 +92,14 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
       setAgentId("");
       onClose();
     },
-    onError: (err: any) =>
-      toast.error(err?.message || "Failed to start call"),
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.detail ??
+        (typeof err?.response?.data === "string" ? err.response.data : null) ??
+        err?.message ??
+        "Failed to start call";
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    },
   });
 
   const useTelephony = Boolean(

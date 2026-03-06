@@ -2,6 +2,7 @@
 Telephony API: connect/disconnect Twilio + LiveKit SIP, status, and outbound call.
 Uses UserTelephonyConfig (encrypted credentials) and current_user auth.
 """
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -160,6 +161,9 @@ async def assign_agent(
     return {"assigned_agent_id": body.agent_id}
 
 
+logger = logging.getLogger(__name__)
+
+
 @router.post("/call", response_model=CallResponse)
 async def place_call(
     body: CallBody,
@@ -180,3 +184,9 @@ async def place_call(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Outbound call failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to start outbound call. Check that Twilio is connected and the agent worker is running, or reconnect in Settings.",
+        )
