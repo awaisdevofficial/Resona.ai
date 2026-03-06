@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, _is_cartesia_voice_id
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
@@ -66,12 +66,11 @@ async def get_voices(
   db: AsyncSession = Depends(get_db),
 ):
   """
-  Return available voices for the current user.
-  Cartesia Sonic voices (default TTS), Deepgram Aura 2, and user-specific cloned voices.
+  Return available voices for the current user. TTS is Cartesia only: Cartesia Sonic voices plus custom clones.
   """
   voices: list[Voice] = []
 
-  # Cartesia Sonic voices (recommended default TTS – list first)
+  # Cartesia Sonic voices only (used for all live and web calls)
   def _cartesia_voices() -> list[Voice]:
     return [
       Voice(id=DEFAULT_CARTESIA_VOICE_ID, name="Katie", gender="female", provider="cartesia", description="Stable, natural – recommended for agents"),
@@ -81,26 +80,7 @@ async def get_voices(
     ]
   voices.extend(_cartesia_voices())
 
-  # Deepgram Aura 2 voices
-  def _deepgram_aura_voices() -> list[Voice]:
-    return [
-      Voice(id="aura-2-andromeda-en", name="Andromeda", gender="female", provider="deepgram", description="Warm and natural"),
-      Voice(id="aura-2-athena-en", name="Athena", gender="female", provider="deepgram", description="Professional and clear"),
-      Voice(id="aura-2-orion-en", name="Orion", gender="male", provider="deepgram", description="Deep and authoritative"),
-      Voice(id="aura-2-stella-en", name="Stella", gender="female", provider="deepgram", description="Energetic and bright"),
-      Voice(id="aura-2-hera-en", name="Hera", gender="female", provider="deepgram", description="Confident and strong"),
-      Voice(id="aura-2-zeus-en", name="Zeus", gender="male", provider="deepgram", description="Powerful and commanding"),
-      Voice(id="aura-2-arcas-en", name="Arcas", gender="male", provider="deepgram", description="Friendly and warm"),
-      Voice(id="aura-2-perseus-en", name="Perseus", gender="male", provider="deepgram", description="Clear and professional"),
-      Voice(id="aura-2-angus-en", name="Angus", gender="male", provider="deepgram", description="Casual and relaxed"),
-      Voice(id="aura-2-orpheus-en", name="Orpheus", gender="male", provider="deepgram", description="Rich and smooth"),
-      Voice(id="aura-2-helios-en", name="Helios", gender="male", provider="deepgram", description="Bright and upbeat"),
-      Voice(id="aura-asteria-en", name="Asteria (legacy)", gender="female", provider="deepgram", description="Warm and friendly"),
-      Voice(id="aura-luna-en", name="Luna (legacy)", gender="female", provider="deepgram", description="Soft and calm"),
-    ]
-  voices.extend(_deepgram_aura_voices())
-
-  # User-specific cloned voices (e.g. Chatterbox)
+  # User-specific cloned voices (Cartesia UUIDs only are used for TTS; others fall back to default)
   custom_voices = await _get_user_voice_profiles(user, db)
   voices.extend(custom_voices)
   return voices
@@ -113,68 +93,39 @@ async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_curr
   Returns a streamed audio response (MP3 or WAV depending on provider).
   """
 
-  provider = body.provider.lower()
+  # TTS is Cartesia only for all calls and previews
+  provider = (body.provider or "cartesia").lower()
+  if provider != "cartesia":
+    raise HTTPException(status_code=400, detail="TTS is Cartesia only. Use provider 'cartesia'.")
+
   text = body.text.strip() or "Hi, I am your AI voice assistant, ready to help you on every call."
+  if not settings.CARTESIA_API_KEY:
+    raise HTTPException(status_code=400, detail="Cartesia API key not configured")
 
-  # Cartesia Sonic TTS preview (MP3)
-  if provider == "cartesia":
-    if not settings.CARTESIA_API_KEY:
-      raise HTTPException(status_code=400, detail="Cartesia API key not configured")
+  voice_id = body.voice_id if _is_cartesia_voice_id(body.voice_id or "") else DEFAULT_CARTESIA_VOICE_ID
 
-    voice_id = body.voice_id or DEFAULT_CARTESIA_VOICE_ID
+  async def cartesia_preview():
+    async with httpx.AsyncClient(timeout=30) as client:
+      resp = await client.post(
+        "https://api.cartesia.ai/tts/bytes",
+        headers={
+          "Cartesia-Version": "2024-11-13",
+          "X-API-Key": settings.CARTESIA_API_KEY,
+          "Content-Type": "application/json",
+        },
+        json={
+          "model_id": "sonic-3",
+          "transcript": text,
+          "voice": {"mode": "id", "id": voice_id},
+          "output_format": {"container": "mp3", "sample_rate": 24000, "bit_rate": 128000},
+        },
+      )
+      if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Cartesia TTS failed")
+      return resp.content
 
-    async def cartesia_preview():
-      async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-          "https://api.cartesia.ai/tts/bytes",
-          headers={
-            "Cartesia-Version": "2024-11-13",
-            "X-API-Key": settings.CARTESIA_API_KEY,
-            "Content-Type": "application/json",
-          },
-          json={
-            "model_id": "sonic-3",
-            "transcript": text,
-            "voice": {"mode": "id", "id": voice_id},
-            "output_format": {"container": "mp3", "sample_rate": 24000, "bit_rate": 128000},
-          },
-        )
-        if resp.status_code != 200:
-          raise HTTPException(status_code=502, detail="Cartesia TTS failed")
-        return resp.content
-
-    content = await cartesia_preview()
-    return StreamingResponse(iter([content]), media_type="audio/mpeg")
-
-  # Deepgram Aura TTS preview (MP3)
-  if provider == "deepgram":
-    if not settings.DEEPGRAM_API_KEY:
-      raise HTTPException(status_code=400, detail="Deepgram API key not configured")
-
-    model = body.voice_id or "aura-2-andromeda-en"
-    if model == "default":
-      model = "aura-2-andromeda-en"
-
-    async def deepgram_stream():
-      async with httpx.AsyncClient(timeout=30) as client:
-        async with client.stream(
-          "POST",
-          "https://api.deepgram.com/v1/speak",
-          params={"model": model},
-          headers={
-            "Authorization": f"Token {settings.DEEPGRAM_API_KEY}",
-            "Content-Type": "application/json",
-          },
-          json={"text": text},
-        ) as resp:
-          if resp.status_code != 200:
-            raise HTTPException(status_code=502, detail="Deepgram TTS failed")
-          async for chunk in resp.aiter_bytes():
-            yield chunk
-
-    return StreamingResponse(deepgram_stream(), media_type="audio/mpeg")
-
-  raise HTTPException(status_code=400, detail=f"Unsupported TTS provider: {provider}. Use cartesia or deepgram.")
+  content = await cartesia_preview()
+  return StreamingResponse(iter([content]), media_type="audio/mpeg")
 
 
 @router.post("/clone/chatterbox")

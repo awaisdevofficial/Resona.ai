@@ -48,24 +48,6 @@ def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
 
-# Map legacy Aura 1 / display names to Deepgram Aura 2 model names
-DEEPGRAM_TTS_MODEL_MAP = {
-    "aura-asteria-en": "aura-2-andromeda-en",
-    "aura-luna-en": "aura-2-athena-en",
-    "aura-stella-en": "aura-2-athena-en",
-    "aura-athena-en": "aura-2-athena-en",
-    "aura-hera-en": "aura-2-athena-en",
-    "aura-orion-en": "aura-2-andromeda-en",
-    "aura-arcas-en": "aura-2-andromeda-en",
-    "aura-perseus-en": "aura-2-orion-en",
-    "aura-angus-en": "aura-2-orion-en",
-    "aura-orpheus-en": "aura-2-orion-en",
-    "aura-helios-en": "aura-2-orion-en",
-    "aura-zeus-en": "aura-2-orion-en",
-    "default": "aura-2-andromeda-en",
-}
-
-
 async def entrypoint(ctx: JobContext):
     logger.info("Agent job started room=%s", ctx.room.name)
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -136,11 +118,8 @@ async def entrypoint(ctx: JobContext):
     stt_language = agent_config.get("stt_language", "en-US")
     stt_model = agent_config.get("stt_model") or "nova-2-general"
 
-    tts_provider, tts_voice_id = get_tts_provider_and_voice_id(
+    _, tts_voice_id = get_tts_provider_and_voice_id(
         agent_config.get("tts_provider"), agent_config.get("tts_voice_id")
-    )
-    tts_model = DEEPGRAM_TTS_MODEL_MAP.get(tts_voice_id) or (
-        tts_voice_id if str(tts_voice_id).startswith("aura-2-") else "aura-2-andromeda-en"
     )
 
     # Track transcript lines and call duration
@@ -181,25 +160,16 @@ async def entrypoint(ctx: JobContext):
         model="llama-3.3-70b-versatile",
         api_key=groq_key,
     )
-    # TTS: Cartesia (default) or Deepgram
-    if tts_provider == "cartesia":
-        cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
-        if not cartesia_key:
-            raise RuntimeError(
-                "CARTESIA_API_KEY is required when tts_provider is cartesia. Set it in the environment."
-            )
-        cartesia_voice = tts_voice_id or DEFAULT_CARTESIA_VOICE_ID
-        tts = cartesia.TTS(
-            model="sonic-3",
-            voice=cartesia_voice,
-            api_key=cartesia_key,
-            sample_rate=24000,
-        )
-    else:
-        tts = deepgram.TTS(
-            model=tts_model,
-            api_key=deepgram_key,
-        )
+    # TTS: Cartesia only
+    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
+    if not cartesia_key:
+        raise RuntimeError("CARTESIA_API_KEY is required for TTS. Set it in the environment.")
+    tts = cartesia.TTS(
+        model="sonic-3",
+        voice=tts_voice_id or DEFAULT_CARTESIA_VOICE_ID,
+        api_key=cartesia_key,
+        sample_rate=24000,
+    )
 
     # Turn detection: STT; tune for faster response and fewer false cuts (1.5.x accepts these kwargs)
     session = AgentSession(

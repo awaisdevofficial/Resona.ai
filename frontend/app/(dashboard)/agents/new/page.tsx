@@ -115,7 +115,7 @@ export default function NewAgentPage() {
         },
         body: JSON.stringify({
           voice_id: form.getValues("tts_voice_id"),
-          provider: form.getValues("tts_provider") || "cartesia",
+          provider: "cartesia",
           text:
             "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
@@ -338,7 +338,7 @@ export default function NewAgentPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-[#9CA3AF]">
-                    Browse real human voices powered by Cartesia or Deepgram. Choose a
+                    Browse voices powered by Cartesia (used for all calls). Choose a
                     voice before saving your agent.
                   </p>
                   {form.formState.errors.tts_voice_id && (
@@ -523,7 +523,7 @@ export default function NewAgentPage() {
         selectedProvider={watchedProvider || "cartesia"}
         onSelect={(voice: Voice) => {
           form.setValue("tts_voice_id", voice.id)
-          form.setValue("tts_provider", voice.provider)
+          form.setValue("tts_provider", "cartesia")
         }}
       />
     </div>
