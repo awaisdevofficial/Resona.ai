@@ -17,7 +17,7 @@ from livekit.agents import (
     cli,
 )
 from livekit.agents.llm import function_tool
-from livekit.agents.voice import Agent, AgentSession
+from livekit.agents.voice import Agent, AgentSession, TurnHandlingConfig
 from livekit.agents.voice.events import UserInputTranscribedEvent
 from livekit.agents.voice import room_io as voice_room_io
 from livekit.plugins import cartesia, deepgram, silero, groq
@@ -199,18 +199,17 @@ async def entrypoint(ctx: JobContext):
             api_key=deepgram_key,
         )
 
-    # Session: default AEC warmup (3s) and interruption (0.5s) for stable TTS/STT.
-    # Shorter warmup (1s) and interrupt threshold (0.3s) for better barge-in without breaking pipeline.
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
         llm=llm,
         tts=tts,
-        turn_detection="vad",
-        min_interruption_duration=0.3,
-        min_interruption_words=0,
-        min_endpointing_delay=0.5,
-        max_endpointing_delay=2.5,
+        turn_handling=TurnHandlingConfig(
+            min_endpointing_delay=0.5,
+            max_endpointing_delay=2.5,
+            min_interruption_duration=0.3,
+            min_interruption_words=0,
+        ),
     )
 
     @session.on("user_input_transcribed")
