@@ -171,7 +171,10 @@ async def entrypoint(ctx: JobContext):
         sample_rate=24000,
     )
 
-    # Turn detection: STT; tune for faster response and fewer false cuts (1.5.x accepts these kwargs)
+    # Turn detection: STT; tune for barge-in (stop when user speaks) and fast response
+    # aec_warmup_duration=0 so interruptions work from the very start (default 3s blocks barge-in)
+    # min_interruption_duration=0.1 so brief user speech stops the agent quickly
+    # false_interruption_timeout=None so we don't auto-resume after interrupt (avoids agent talking over user)
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
@@ -181,9 +184,12 @@ async def entrypoint(ctx: JobContext):
         allow_interruptions=True,
         min_endpointing_delay=0.25,
         max_endpointing_delay=2.0,
-        min_interruption_duration=0.2,
+        min_interruption_duration=0.1,
         min_interruption_words=0,
         preemptive_generation=True,
+        aec_warmup_duration=0,
+        false_interruption_timeout=None,
+        resume_false_interruption=False,
     )
 
     @session.on("user_input_transcribed")

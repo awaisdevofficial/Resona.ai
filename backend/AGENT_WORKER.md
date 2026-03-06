@@ -1,5 +1,13 @@
 # Agent worker – run once
 
+## Voice call behavior (barge-in and response)
+
+- **Interruptions:** The agent stops when you start speaking. Key settings in `agent_worker.py`:
+  - `aec_warmup_duration=0` so barge-in works from the very start (default 3s would block interruptions).
+  - `min_interruption_duration=0.1` so brief user speech triggers a stop.
+  - `false_interruption_timeout=None` and `resume_false_interruption=False` so the agent does not auto-resume after you interrupt.
+- **Fast response:** `preemptive_generation=True` and short prompts keep replies quick. If the agent still doesn’t stop when you speak, check that only one worker is running and that the user’s mic is unmuted in the test call UI.
+
 Only **one** agent worker process should be running per LiveKit server. If you run it in both places, you get duplicate workers and odd behavior (e.g. jobs claimed by both, LLM/API errors under load).
 
 - **On the server (Ubuntu):** Run it **only** via systemd: `sudo systemctl start resona-agent`. Do **not** also run `python agent_worker.py run` in a terminal or venv on the same machine.
