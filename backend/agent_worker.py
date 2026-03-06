@@ -17,7 +17,7 @@ from livekit.agents import (
     cli,
 )
 from livekit.agents.llm import function_tool
-from livekit.agents.voice import Agent, AgentSession, TurnHandlingConfig
+from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
 from livekit.agents.voice import room_io as voice_room_io
 from livekit.plugins import cartesia, deepgram, silero, groq
@@ -204,12 +204,10 @@ async def entrypoint(ctx: JobContext):
         stt=stt,
         llm=llm,
         tts=tts,
-        turn_handling=TurnHandlingConfig(
-            min_endpointing_delay=0.5,
-            max_endpointing_delay=2.5,
-            min_interruption_duration=0.3,
-            min_interruption_words=0,
-        ),
+        min_endpointing_delay=0.5,
+        max_endpointing_delay=2.5,
+        min_interruption_duration=0.3,
+        min_interruption_words=0,
     )
 
     @session.on("user_input_transcribed")
