@@ -14,13 +14,13 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("integrations")
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <PageHeader
         title="Settings"
         subtitle="Manage your account and integrations"
       />
 
-      <div className="flex gap-1 mb-8 border-b border-border">
+      <div className="flex gap-1 mb-8 p-1 rounded-lg bg-white/5 border-b-0">
         {[
           { id: "integrations", label: "Integrations" },
           { id: "api-keys", label: "API Keys" },
@@ -29,12 +29,14 @@ export default function SettingsPage() {
         ].map((t) => (
           <button
             key={t.id}
+            type="button"
             onClick={() => setTab(t.id as Tab)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium rounded-md border-b-2 transition-colors",
               tab === t.id
-                ? "border-brand text-brand"
-                : "border-transparent text-muted hover:text-primary"
-            }`}
+                ? "bg-white/10 text-white border-[#4DFFCE]"
+                : "border-transparent text-white/60 hover:text-white hover:bg-white/5"
+            )}
           >
             {t.label}
           </button>
@@ -164,14 +166,14 @@ function IntegrationsTab() {
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Twilio connect card */}
-      <div className="bg-surface border border-border rounded-xl shadow-card p-6">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-semibold text-primary flex items-center gap-2">
+            <h3 className="text-base font-semibold text-white flex items-center gap-2">
               <Phone size={18} />
               Twilio & Phone
             </h3>
-            <p className="text-sm text-muted mt-0.5">
+            <p className="text-sm text-white/70 mt-0.5">
               Connect one Twilio account. Resona sets up the SIP trunk and routing. Add more numbers below and assign an agent to each.
             </p>
           </div>
@@ -197,7 +199,7 @@ function IntegrationsTab() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors"
+              className="btn-primary"
             >
               {status?.is_connected ? "Reconnect (replace)" : "Connect Twilio"}
             </button>
@@ -206,7 +208,7 @@ function IntegrationsTab() {
                 type="button"
                 onClick={() => disconnect.mutate()}
                 disabled={disconnect.isPending}
-                className="px-4 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                className="px-4 py-2 border border-red-500/30 text-red-400 text-sm font-medium rounded-full hover:bg-red-500/20 transition-colors disabled:opacity-50"
               >
                 {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
               </button>
@@ -215,55 +217,55 @@ function IntegrationsTab() {
         )}
 
         {showForm && (
-          <div className="space-y-3 mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+          <div className="space-y-3 mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">Account SID</label>
+              <label className="block text-xs font-medium text-white/70 mb-1 uppercase tracking-wide">Account SID</label>
               <input
                 value={accountSid}
                 onChange={(e) => setAccountSid(e.target.value)}
                 placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:border-brand bg-surface"
+                className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30 bg-white/5"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">Auth Token</label>
+              <label className="block text-xs font-medium text-white/70 mb-1 uppercase tracking-wide">Auth Token</label>
               <div className="relative">
                 <input
                   type={showToken ? "text" : "password"}
                   value={authToken}
                   onChange={(e) => setAuthToken(e.target.value)}
                   placeholder="Your Twilio auth token"
-                  className="w-full px-3 py-2 pr-10 border border-border rounded-lg text-sm font-mono focus:outline-none focus:border-brand bg-surface"
+                  className="w-full px-3 py-2 pr-10 border border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30 bg-white/5"
                 />
-                <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+                <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white">
                   {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">Phone number (E.164)</label>
+              <label className="block text-xs font-medium text-white/70 mb-1 uppercase tracking-wide">Phone number (E.164)</label>
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="+12025551234"
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:border-brand bg-surface"
+                className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30 bg-white/5"
               />
-              <p className="text-xs text-muted mt-1">Primary number for this account. Must be in your Twilio account.</p>
+              <p className="text-xs text-white/70 mt-1">Primary number for this account. Must be in your Twilio account.</p>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => connect.mutate()}
                 disabled={!accountSid.trim() || !authToken.trim() || !phoneNumber.trim() || connect.isPending}
-                className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50"
+                className="btn-primary disabled:opacity-50"
               >
                 {connect.isPending ? "Connecting…" : "Connect"}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setAccountSid(""); setAuthToken(""); setPhoneNumber(""); }}
-                className="px-4 py-2 border border-border text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                className="btn-secondary text-sm"
               >
                 Cancel
               </button>
@@ -274,11 +276,11 @@ function IntegrationsTab() {
 
       {/* Numbers & agents: one table, import, assign agent per number */}
       {status?.is_connected && (
-        <div className="bg-surface border border-border rounded-xl shadow-card p-6">
+        <div className="bg-white/5 border border-white/10 rounded-xl shadow-card p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-semibold text-primary">Numbers & agents</h3>
-              <p className="text-sm text-muted mt-0.5">
+              <h3 className="text-base font-semibold text-white">Numbers & agents</h3>
+              <p className="text-sm text-white/70 mt-0.5">
                 Assign an agent to each number. Inbound calls to that number will be handled by the assigned agent.
               </p>
             </div>
@@ -288,7 +290,7 @@ function IntegrationsTab() {
               disabled={importNumbers.isPending}
               className={cn(
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium",
-                "bg-background border border-border text-primary hover:bg-background/80 transition-colors disabled:opacity-50"
+                "bg-white/5 border border-white/10 text-white hover:bg-white/10/80 transition-colors disabled:opacity-50"
               )}
             >
               <RefreshCw size={14} className={importNumbers.isPending ? "animate-spin" : ""} />
@@ -297,34 +299,34 @@ function IntegrationsTab() {
           </div>
 
           {allRows.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-background/30 py-8 px-4 text-center">
-              <p className="text-sm text-muted">No numbers yet. Connect Twilio above, then use &quot;Import more numbers&quot; to sync from your Twilio account.</p>
+            <div className="rounded-lg border border-dashed border-white/10 bg-white/5/30 py-8 px-4 text-center">
+              <p className="text-sm text-white/70">No numbers yet. Connect Twilio above, then use &quot;Import more numbers&quot; to sync from your Twilio account.</p>
               <button
                 type="button"
                 onClick={() => importNumbers.mutate()}
                 disabled={importNumbers.isPending}
-                className="mt-3 px-3 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark disabled:opacity-50"
+                className="mt-3 btn-primary disabled:opacity-50"
               >
                 {importNumbers.isPending ? "Importing…" : "Import numbers"}
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
+            <div className="overflow-x-auto rounded-lg border border-white/10">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-background/50 border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted">Number</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted">Agent</th>
+                  <tr className="bg-white/5/50 border-b border-white/10">
+                    <th className="text-left py-3 px-4 font-medium text-white/70">Number</th>
+                    <th className="text-left py-3 px-4 font-medium text-white/70">Agent</th>
                     <th className="w-12 py-3 px-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {allRows.map((row) => (
-                    <tr key={row.id} className="border-b border-border last:border-0 hover:bg-background/30 transition-colors">
+                    <tr key={row.id} className="border-b border-white/10 last:border-0 hover:bg-white/10/30 transition-colors">
                       <td className="py-3 px-4">
-                        <span className="font-mono text-primary">{row.number}</span>
+                        <span className="font-mono text-white">{row.number}</span>
                         {row.isPrimary && (
-                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-brand/10 text-brand font-medium">Primary</span>
+                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#4DFFCE]/20 text-[#4DFFCE] font-medium">Primary</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
@@ -338,7 +340,7 @@ function IntegrationsTab() {
                               assignNumberAgent.mutate({ numberId: row.id, agentId: id })
                             }
                           }}
-                          className="w-full max-w-[200px] px-3 py-2 border border-border rounded-lg bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                          className="w-full max-w-[200px] px-3 py-2 border border-white/10 rounded-lg bg-white/5 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30"
                         >
                           <option value="">No agent</option>
                           {agents.map((a) => (
@@ -348,14 +350,14 @@ function IntegrationsTab() {
                       </td>
                       <td className="py-3 px-2 text-right">
                         {row.isPrimary ? (
-                          <span className="text-xs text-muted">—</span>
+                          <span className="text-xs text-white/70">—</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => {
                               if (confirm(`Release ${row.number}?`)) releaseNumber.mutate(row.id)
                             }}
-                            className="p-1.5 rounded text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+                            className="p-1.5 rounded text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             title="Release number"
                           >
                             <Trash2 size={14} />
@@ -424,9 +426,9 @@ function ApiKeysTab() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="bg-surface border border-border rounded-xl shadow-card p-6">
-        <h3 className="text-base font-semibold text-primary mb-1">API Keys</h3>
-        <p className="text-sm text-muted mb-4">
+      <div className="bg-white/5 border border-white/10 rounded-xl shadow-card p-6">
+        <h3 className="text-base font-semibold text-white mb-1">API Keys</h3>
+        <p className="text-sm text-white/70 mb-4">
           Create keys to access the Resona API programmatically. Keys are shown once on creation.
         </p>
         <div className="flex gap-2 mb-4">
@@ -434,35 +436,35 @@ function ApiKeysTab() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Key name (e.g. Production)"
-            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-brand"
+            className="form-input flex-1"
           />
           <button
             type="button"
             onClick={() => create.mutate(name)}
             disabled={!name.trim() || create.isPending}
-            className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark disabled:opacity-50"
+            className="btn-primary disabled:opacity-50"
           >
             {create.isPending ? "Creating..." : "Create key"}
           </button>
         </div>
         {newKey && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-            <p className="text-xs font-medium text-amber-800 mb-1">Save this key. You won&apos;t see it again.</p>
+          <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-3 mb-4">
+            <p className="text-xs font-medium text-amber-200 mb-1">Save this key. You won&apos;t see it again.</p>
             <div className="flex gap-2 items-center">
-              <code className="flex-1 text-sm font-mono text-amber-900 truncate bg-amber-100 px-2 py-1 rounded">
+              <code className="flex-1 text-sm font-mono text-amber-100 truncate bg-white/10 px-2 py-1 rounded">
                 {newKey}
               </code>
               <button
                 type="button"
                 onClick={copyKey}
-                className="px-3 py-1.5 text-sm font-medium text-amber-800 border border-amber-300 rounded hover:bg-amber-100"
+                className="px-3 py-1.5 text-sm font-medium text-amber-200 border border-amber-500/40 rounded hover:bg-amber-500/20"
               >
                 Copy
               </button>
               <button
                 type="button"
                 onClick={dismissNewKey}
-                className="px-3 py-1.5 text-sm font-medium text-amber-800 border border-amber-300 rounded hover:bg-amber-100"
+                className="px-3 py-1.5 text-sm font-medium text-amber-200 border border-amber-500/40 rounded hover:bg-amber-500/20"
               >
                 Done
               </button>
@@ -473,24 +475,24 @@ function ApiKeysTab() {
           {keys?.map((k) => (
             <li
               key={k.id}
-              className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg border border-white/10"
             >
               <div>
-                <span className="text-sm font-medium text-primary">{k.name || "Unnamed"}</span>
-                <span className="text-xs font-mono text-muted ml-2">{k.prefix}...</span>
+                <span className="text-sm font-medium text-white">{k.name || "Unnamed"}</span>
+                <span className="text-xs font-mono text-white/70 ml-2">{k.prefix}...</span>
               </div>
               <button
                 type="button"
                 onClick={() => revoke.mutate(k.id)}
                 disabled={revoke.isPending}
-                className="text-sm text-red-600 hover:text-red-700"
+                className="text-sm text-red-400 hover:text-red-300"
               >
                 Revoke
               </button>
             </li>
           ))}
           {(!keys || keys.length === 0) && (
-            <li className="text-sm text-muted py-4">No API keys yet.</li>
+            <li className="text-sm text-white/70 py-4">No API keys yet.</li>
           )}
         </ul>
       </div>
@@ -500,7 +502,7 @@ function ApiKeysTab() {
 
 function ProfileTab() {
   return (
-    <div className="text-sm text-muted">
+    <div className="text-sm text-white/70">
       Profile settings will be available in a future update.
     </div>
   )
@@ -508,7 +510,7 @@ function ProfileTab() {
 
 function BillingTab() {
   return (
-    <div className="text-sm text-muted">
+    <div className="text-sm text-white/70">
       Billing settings will be available in a future update.
     </div>
   )

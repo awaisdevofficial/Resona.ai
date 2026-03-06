@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, actions, className }: Props) {
       <div>
         <h1 className="text-2xl font-semibold text-white">{title}</h1>
         {subtitle && (
-          <p className="text-sm text-white/50 mt-1">{subtitle}</p>
+          <p className="text-sm text-white/70 mt-1">{subtitle}</p>
         )}
       </div>
       {actions && (

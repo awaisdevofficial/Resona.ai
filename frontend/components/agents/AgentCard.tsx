@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Trash2, Copy, Mic, Phone, Pencil } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { MoreVertical, Trash2, Copy, Pencil, Phone, Beaker } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import toast from "react-hot-toast";
 
@@ -14,6 +14,7 @@ interface AgentCardProps {
   name: string;
   description?: string | null;
   tts_voice_id?: string;
+  voiceName?: string;
   is_active?: boolean;
   call_count?: number;
   system_prompt?: string | null;
@@ -25,12 +26,12 @@ export function AgentCard({
   name,
   description,
   tts_voice_id,
+  voiceName,
   is_active = true,
   call_count = 0,
   system_prompt,
   onTestCall,
 }: AgentCardProps) {
-  const router = useRouter();
   const qc = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -65,67 +66,84 @@ export function AgentCard({
     onError: () => toast.error("Failed to duplicate"),
   });
 
-  const promptPreview = (system_prompt || "No system prompt.").slice(0, 80);
-  const promptDisplay = promptPreview.length >= 80 ? `${promptPreview}...` : promptPreview;
-
-  function handleCardClick() {
-    if (menuOpen) {
-      setMenuOpen(false);
-      return;
-    }
-    router.push(`/agents/${id}`);
-  }
+  const descriptionDisplay =
+    description?.trim() ||
+    (system_prompt
+      ? `${(system_prompt || "").slice(0, 100)}${(system_prompt || "").length > 100 ? "…" : ""}`
+      : "No description.");
+  const voiceLabel =
+    voiceName ??
+    (tts_voice_id
+      ? tts_voice_id.length > 14
+        ? `${tts_voice_id.slice(0, 10)}…`
+        : tts_voice_id
+      : "Default");
+  const initials = (name || "A").slice(0, 2).toUpperCase();
 
   return (
     <div
       className={cn(
-        "relative bg-surface border border-border rounded-card shadow-card p-5",
-        "flex flex-col gap-3 hover:-translate-y-0.5 hover:shadow-dropdown hover:border-border/80",
-        "transition-all duration-200 cursor-pointer"
+        "group relative rounded-2xl border bg-white/[0.03] p-6 transition-all duration-300",
+        "hover:border-[#4DFFCE]/25 hover:bg-white/[0.05] hover:shadow-[0_0_0_1px_rgba(77,255,206,0.08)]",
+        "border-white/10"
       )}
-      onClick={handleCardClick}
     >
-      <div className="flex items-start justify-between gap-2 min-w-0">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <span
+      {/* Top: avatar + name + menu */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
             className={cn(
-              "inline-flex h-2 w-2 rounded-full flex-shrink-0",
-              is_active ? "bg-success" : "bg-text-muted"
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold transition-colors",
+              is_active
+                ? "bg-[#4DFFCE]/15 text-[#4DFFCE] border border-[#4DFFCE]/25"
+                : "bg-white/10 text-white/50 border border-white/10"
             )}
-          />
-          <h3 className="text-section-title text-text-primary truncate">
-            {name || "Untitled agent"}
-          </h3>
+          >
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-white truncate">
+              {name || "Untitled agent"}
+            </h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span
+                className={cn(
+                  "inline-flex h-5 items-center rounded-md px-2 text-[10px] font-medium uppercase tracking-wider",
+                  is_active
+                    ? "bg-[#4DFFCE]/15 text-[#4DFFCE]"
+                    : "bg-white/10 text-white/50"
+                )}
+              >
+                {is_active ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
         </div>
-        <div
-          ref={menuRef}
-          className="relative shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div ref={menuRef} className="relative shrink-0">
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="p-1.5 rounded-button text-text-muted hover:text-text-primary hover:bg-background transition-all duration-150 active:scale-95"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <MoreVertical size={16} />
+            <MoreVertical size={18} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-button shadow-dropdown z-10 py-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  router.push(`/agents/${id}`);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-body text-text-primary hover:bg-background text-left rounded-button mx-1 transition-colors"
+            <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/10 bg-[#0f1216] py-1 shadow-xl">
+              <Link
+                href={`/agents/${id}`}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <Pencil size={14} />
                 Edit
-              </button>
+              </Link>
               <button
                 type="button"
                 onClick={() => duplicateAgent.mutate()}
-                className="w-full flex items-center gap-2 px-3 py-2 text-body text-text-primary hover:bg-background text-left rounded-button mx-1 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white text-left transition-colors"
               >
                 <Copy size={14} />
                 Duplicate
@@ -133,11 +151,11 @@ export function AgentCard({
               <button
                 type="button"
                 onClick={() => {
-                  if (confirm(`Delete agent "${name}"? This cannot be undone.`)) {
+                  if (confirm(`Delete "${name}"? This cannot be undone.`)) {
                     deleteAgent.mutate();
                   }
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-body text-error hover:bg-red-50 text-left rounded-button mx-1 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 text-left transition-colors"
               >
                 <Trash2 size={14} />
                 Delete
@@ -147,49 +165,42 @@ export function AgentCard({
         </div>
       </div>
 
-      <p className="text-body text-text-secondary line-clamp-2 min-h-[2.5rem]">
-        {promptDisplay}
+      {/* Description */}
+      <p className="text-sm text-white/60 line-clamp-2 mb-5 min-h-[2.5rem] leading-relaxed">
+        {descriptionDisplay}
       </p>
 
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-border">
-        <span className="text-label text-text-muted">
-          {tts_voice_id ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Mic size={12} className="text-brand" />
-              {tts_voice_id}
-            </span>
-          ) : (
-            "No voice"
-          )}
+      {/* Meta: voice + calls */}
+      <div className="flex flex-wrap items-center gap-3 mb-5 text-xs">
+        <span className="rounded-lg bg-white/5 px-2.5 py-1.5 text-white/70 border border-white/5">
+          Voice: {voiceLabel}
         </span>
-        <span className="text-label text-text-muted">
-          {call_count} {call_count === 1 ? "call" : "calls"}
+        <span className="flex items-center gap-1.5 text-white/50">
+          <Phone size={12} />
+          {call_count.toLocaleString()} calls
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Actions */}
+      <div className="flex gap-3">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onTestCall?.();
           }}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-brand text-white text-label font-semibold rounded-button hover:bg-brand-dark transition-all duration-150 active:scale-95"
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#4DFFCE] px-4 py-2.5 text-sm font-semibold text-[#07080A] transition-all hover:bg-[#5affd6] hover:shadow-[0_0_20px_rgba(77,255,206,0.25)]"
         >
-          <Phone size={12} />
+          <Beaker size={14} />
           Test
         </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            router.push(`/agents/${id}`);
-          }}
-          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-border text-text-primary text-label font-medium rounded-button hover:bg-background transition-all duration-150 active:scale-95"
+        <Link
+          href={`/agents/${id}`}
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-white transition-all hover:border-[#4DFFCE]/40 hover:bg-white/5"
         >
-          <Pencil size={12} />
+          <Pencil size={14} />
           Edit
-        </button>
+        </Link>
       </div>
     </div>
   );

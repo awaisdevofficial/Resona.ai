@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Search, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { api } from "@/lib/api";
 import { cn } from "@/components/lib-utils";
@@ -23,6 +22,7 @@ type KBEntry = {
 export default function KnowledgeBasePage() {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -31,6 +31,15 @@ export default function KnowledgeBasePage() {
     queryKey: ["knowledge-bases"],
     queryFn: () => api.get("/v1/knowledge-base") as Promise<KBEntry[]>,
   });
+
+  const filteredEntries = useMemo(() => {
+    if (!searchQuery.trim()) return entries;
+    const q = searchQuery.toLowerCase();
+    return entries.filter(
+      (e: KBEntry) =>
+        e.name.toLowerCase().includes(q) || e.content.toLowerCase().includes(q)
+    );
+  }, [entries, searchQuery]);
 
   const { data: agents = [] } = useQuery({
     queryKey: ["agents"],
@@ -76,75 +85,83 @@ export default function KnowledgeBasePage() {
   };
 
   return (
-    <div className="animate-route-in">
+    <div className="animate-fade-in">
       <PageHeader
         title="Knowledge Base"
         subtitle="Add and manage knowledge your agents can use during calls"
         actions={
-          <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
-            <Plus size={16} className="mr-1.5" />
+          <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus size={16} />
             Add entry
-          </Button>
+          </button>
         }
       />
 
+      <div className="relative mb-6">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60" size={18} />
+        <input
+          type="text"
+          placeholder="Search knowledge entries..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="form-input pl-11 w-full max-w-md"
+        />
+      </div>
+
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-32 rounded-card bg-surface border border-border shadow-card animate-pulse"
-            />
+            <div key={i} className="h-32 glass-card animate-pulse" />
           ))}
         </div>
       ) : !entries.length ? (
-        <div className="bg-surface rounded-card border border-border shadow-card">
-          <EmptyState
-            icon={
-              <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center shadow-card">
-                <BookOpen size={28} className="text-brand" />
-              </div>
-            }
-            title="No knowledge base entries"
-            description="Add text content that your agents can use to answer questions."
-            action={{
-              label: "Add entry",
-              onClick: () => setAddOpen(true),
-            }}
-          />
-        </div>
+        <EmptyState
+          icon={
+            <div className="w-16 h-16 rounded-2xl bg-[#4DFFCE]/10 flex items-center justify-center mx-auto">
+              <BookOpen size={28} className="text-[#4DFFCE]" />
+            </div>
+          }
+          title="No knowledge base entries"
+          description="Add your first knowledge entry to help your agents answer questions."
+          action={
+            <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+              <Plus size={16} />
+              Add entry
+            </button>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {entries.map((entry) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filteredEntries.map((entry: KBEntry) => (
             <div
               key={entry.id}
-              className="bg-surface rounded-card border border-border shadow-card p-5 hover:-translate-y-0.5 hover:shadow-dropdown transition-all duration-200"
+              className="glass-card p-5 group hover:border-[#4DFFCE]/20 transition-all"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
-                  <BookOpen size={18} className="text-brand" />
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#4DFFCE]/10 flex items-center justify-center">
+                    <BookOpen size={18} className="text-[#4DFFCE]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-white">{entry.name}</h3>
+                    <p className="text-xs text-white/60">
+                      {entry.agent_id
+                        ? agents.find((a: any) => a.id === entry.agent_id)?.name ?? "Assigned"
+                        : "Not assigned"}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     if (confirm("Delete this entry?")) remove.mutate(entry.id);
                   }}
-                  className="p-1.5 rounded-button text-text-muted hover:text-error hover:bg-red-50 transition-colors"
+                  className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
               </div>
-              <h3 className="text-section-title text-text-primary mt-3 truncate">
-                {entry.name}
-              </h3>
-              <p className="text-body text-text-secondary line-clamp-2 mt-1">
-                {entry.content}
-              </p>
-              <p className="text-label text-text-muted mt-3">
-                {entry.agent_id
-                  ? agents.find((a: any) => a.id === entry.agent_id)?.name ?? "Assigned"
-                  : "Not assigned"}
-              </p>
+              <p className="text-sm text-white/60 line-clamp-3">{entry.content}</p>
             </div>
           ))}
         </div>
@@ -198,64 +215,58 @@ function AddKnowledgeModal({
         onClick={onClose}
         aria-hidden
       />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-surface rounded-2xl border border-border shadow-modal p-6">
-        <h3 className="text-section-title text-text-primary mb-4">
-          Add knowledge
+      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg glass-card p-6">
+        <h3 className="text-xl font-semibold text-white mb-4">
+          Add Knowledge
         </h3>
-        <div className="flex gap-2 border-b border-border mb-4">
+        <div className="flex gap-2 border-b border-white/10 mb-4">
           <button
             type="button"
-            className="px-4 py-2 text-label font-medium text-brand border-b-2 border-brand -mb-px"
+            className="px-4 py-2 text-sm font-medium text-[#4DFFCE] border-b-2 border-[#4DFFCE] -mb-px"
           >
             Text
           </button>
           <button
             type="button"
             disabled
-            className="px-4 py-2 text-label font-medium text-text-muted cursor-not-allowed opacity-60"
+            className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
           >
             URL
           </button>
           <button
             type="button"
             disabled
-            className="px-4 py-2 text-label font-medium text-text-muted cursor-not-allowed opacity-60"
+            className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
           >
             PDF
           </button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-label text-text-secondary mb-1.5">
-              Name
-            </label>
+            <label className="form-label">Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Product FAQ"
-              className="w-full px-3 py-2.5 border border-border rounded-input text-body bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+              placeholder="e.g. Product FAQ, Company Info"
+              className="form-input"
             />
           </div>
           <div>
-            <label className="block text-label text-text-secondary mb-1.5">
-              Content
-            </label>
+            <label className="form-label">Content</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste or type content..."
+              placeholder="Paste text directly..."
               rows={6}
-              className="w-full px-3 py-2.5 border border-border rounded-input text-body bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all resize-none"
+              className="form-input resize-none"
             />
           </div>
           <div>
-            <label className="block text-label text-text-secondary mb-1.5">
-              Assign to agent (optional)
-            </label>
+            <label className="form-label">Assign to agent (optional)</label>
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-border rounded-input text-body bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="form-input"
             >
               <option value="">No agent</option>
               {agents.map((a: any) => (
@@ -267,17 +278,17 @@ function AddKnowledgeModal({
           </div>
         </div>
         <div className="flex gap-3 mt-6">
-          <Button variant="secondary" onClick={onClose} className="flex-1">
+          <button type="button" onClick={onClose} className="btn-secondary flex-1">
             Cancel
-          </Button>
-          <Button
-            variant="primary"
+          </button>
+          <button
+            type="button"
             onClick={onSubmit}
             disabled={!name.trim() || !content.trim() || isPending}
-            className="flex-1"
+            className="btn-primary flex-1"
           >
             {isPending ? "Adding..." : "Add"}
-          </Button>
+          </button>
         </div>
       </div>
     </>

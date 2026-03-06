@@ -11,7 +11,8 @@ import { CallStatusBadge } from "@/components/calls/CallStatusBadge";
 import { MakeCallModal } from "@/components/calls/MakeCallModal";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api"
+import { cn } from "@/components/lib-utils";
 
 const RANGE_OPTIONS = [
   { id: "7", label: "7d" },
@@ -115,11 +116,12 @@ export default function DashboardPage() {
                   key={opt.id}
                   type="button"
                   onClick={() => setRange(opt.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                     range === opt.id
-                      ? "bg-white/10 text-white"
-                      : "text-white/50 hover:text-white"
-                  }`}
+                      ? "bg-[#4DFFCE]/20 text-[#4DFFCE] border border-[#4DFFCE]/40"
+                      : "text-white/70 hover:text-white border border-transparent"
+                  )}
                 >
                   {opt.label}
                 </button>
@@ -155,7 +157,7 @@ function RecentCallsList({ calls }: { calls: any[] }) {
   if (!calls.length) {
     return (
       <div className="py-12 text-center">
-        <p className="text-sm text-white/50">No calls yet</p>
+        <p className="text-sm text-white/70">No calls yet</p>
       </div>
     );
   }
@@ -183,7 +185,7 @@ function RecentCallsList({ calls }: { calls: any[] }) {
               <p className="text-sm font-medium text-white">
                 {call.agent_name ?? call.from_number ?? call.to_number ?? "—"}
               </p>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/65">
                 {call.to_number ?? call.from_number ?? call.direction ?? "—"}
               </p>
             </div>

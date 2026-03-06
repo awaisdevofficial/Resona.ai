@@ -43,7 +43,7 @@ export default function DashboardLayout({
       <div className="page-container flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#4DFFCE]/20 animate-pulse" />
-          <p className="text-sm text-white/50">Loading...</p>
+          <p className="text-sm text-white/70">Loading...</p>
         </div>
       </div>
     );

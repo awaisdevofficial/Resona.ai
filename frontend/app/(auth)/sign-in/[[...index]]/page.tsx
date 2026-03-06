@@ -41,7 +41,7 @@ export default function SignInPage() {
             <h1 className="text-2xl font-semibold text-white mb-2">
               Sign in
             </h1>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-white/70">
               Sign in with your email and password
             </p>
           </div>
@@ -73,7 +73,7 @@ export default function SignInPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
                 >
                   {showPassword ? (
                     <EyeOff size={18} />
@@ -106,7 +106,7 @@ export default function SignInPage() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-white/50 mt-6">
+          <p className="text-center text-sm text-white/70 mt-6">
             Don&apos;t have an account?{" "}
             <Link href="/sign-up" className="text-[#4DFFCE] hover:underline">
               Sign up

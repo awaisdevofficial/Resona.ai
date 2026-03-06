@@ -48,13 +48,15 @@ export default function AnalyticsPage() {
       ),
   });
 
+  const summaryData = summary as { total_calls?: number; total_minutes?: number; active_agents?: number; total_cost_cents?: number } | undefined;
+
   return (
-    <div className="animate-route-in">
+    <div className="animate-fade-in">
       <PageHeader
         title="Analytics"
         subtitle="Detailed insights into your call activity"
         actions={
-          <div className="inline-flex rounded-button border border-border bg-surface p-0.5 shadow-sm">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/5">
             {[
               { id: "today", label: "Today" },
               { id: "7", label: "7d" },
@@ -66,10 +68,10 @@ export default function AnalyticsPage() {
                 type="button"
                 onClick={() => setRange(opt.id as RangeKey)}
                 className={cn(
-                  "px-3 py-1.5 text-label font-medium rounded-md transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-inset",
+                  "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                   range === opt.id
-                    ? "bg-brand text-white border-0"
-                    : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                    ? "bg-[#4DFFCE]/20 text-[#4DFFCE] border border-[#4DFFCE]/40"
+                    : "text-white/70 hover:text-white border border-transparent"
                 )}
               >
                 {opt.label}
@@ -79,45 +81,41 @@ export default function AnalyticsPage() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard
           title="Total Calls"
-          value={summary?.total_calls ?? 0}
+          value={summaryData?.total_calls ?? 0}
           icon={Phone}
-          iconBg="bg-brand/10"
-          iconColor="text-brand"
+          iconColor="#4DFFCE"
           trend={{ value: "+12%", positive: true }}
           subtitle="selected range"
         />
         <MetricCard
           title="Minutes Used"
-          value={summary?.total_minutes ?? 0}
+          value={summaryData?.total_minutes ?? 0}
           icon={Clock}
-          iconBg="bg-info/10"
-          iconColor="text-info"
+          iconColor="#60A5FA"
           subtitle="selected range"
         />
         <MetricCard
           title="Active Agents"
-          value={summary?.active_agents ?? 0}
+          value={summaryData?.active_agents ?? 0}
           icon={Bot}
-          iconBg="bg-success/10"
-          iconColor="text-success"
+          iconColor="#34D399"
           subtitle="configured"
         />
         <MetricCard
           title="Total Cost"
-          value={summary?.total_cost_cents ?? 0}
+          value={summaryData?.total_cost_cents ?? 0}
           icon={DollarSign}
-          iconBg="bg-warning/10"
-          iconColor="text-warning"
+          iconColor="#FBBF24"
           format={(v) => `$${(v / 100).toFixed(2)}`}
           subtitle="selected range"
         />
       </div>
 
-      <div className="bg-surface rounded-card border border-border shadow-card p-6">
-        <h2 className="text-section-title text-text-primary mb-4 tracking-tight">
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-medium text-white mb-4 tracking-tight">
           Call volume over time
         </h2>
         <CallVolumeChart data={(timeSeries as any[]) ?? []} />

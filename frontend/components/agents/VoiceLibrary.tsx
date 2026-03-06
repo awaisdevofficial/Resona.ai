@@ -149,17 +149,17 @@ export function VoiceLibrary({
             className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4"
           >
             <div
-              className="bg-surface rounded-2xl shadow-modal border border-border w-full max-w-4xl pointer-events-auto flex flex-col max-h-[90vh]"
+              className="glass-card rounded-2xl w-full max-w-4xl pointer-events-auto flex flex-col max-h-[90vh] border border-white/10"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
                 <div>
-                  <h2 className="text-base font-semibold text-primary flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-white flex items-center gap-2">
                     <Headphones size={18} />
                     Voice Library
                   </h2>
-                  <p className="text-xs text-muted mt-0.5">
-                    Browse real human voices and choose how your agent should sound.
+                  <p className="text-xs text-white/70 mt-0.5">
+                    Browse real human voices and choose how your agent should sound. Voices are loaded from your provider (e.g. Cartesia); more can be added via your provider or API.
                   </p>
                 </div>
                 <button
@@ -168,34 +168,34 @@ export function VoiceLibrary({
                     stopPreview()
                     onClose()
                   }}
-                  className="p-2 rounded-lg text-muted hover:text-primary hover:bg-gray-50 transition-colors"
+                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="px-6 pt-4 pb-3 flex flex-col gap-3 border-b border-border/80">
+              <div className="px-6 pt-4 pb-3 flex flex-col gap-3 border-b border-white/10">
                 {selectedLabel && (
-                  <div className="inline-flex items-center gap-2 text-xs text-muted">
+                  <div className="inline-flex items-center gap-2 text-xs text-white/70">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     Current selection:{" "}
-                    <span className="font-medium text-primary">{selectedLabel}</span>
+                    <span className="font-medium text-white">{selectedLabel}</span>
                   </div>
                 )}
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
                   <div className="relative flex-1">
                     <Search
                       size={14}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70"
                     />
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search by name, style, or provider..."
-                      className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/40"
+                      className="form-input pl-8"
                     />
                   </div>
-                  <div className="inline-flex rounded-full border border-border bg-canvas/80 p-0.5 text-xs font-medium">
+                  <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-0.5 text-xs font-medium">
                     {[
                       { id: "all", label: "All" },
                       { id: "female", label: "Female" },
@@ -209,8 +209,8 @@ export function VoiceLibrary({
                         className={cn(
                           "px-3 py-1.5 rounded-full transition-colors",
                           tab === t.id
-                            ? "bg-brand text-white"
-                            : "text-muted hover:text-primary"
+                            ? "bg-[#4DFFCE] text-[#07080A]"
+                            : "text-white/70 hover:text-white"
                         )}
                       >
                         {t.label}
@@ -225,11 +225,11 @@ export function VoiceLibrary({
 
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="text-sm text-muted">Loading voices…</div>
+                    <div className="text-sm text-white/70">Loading voices…</div>
                   </div>
                 ) : isError ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-red-400">
                       Could not load voices. {(error as Error)?.message || "Please try again."}
                     </p>
                     <Button variant="secondary" size="sm" onClick={() => refetch()}>
@@ -237,7 +237,7 @@ export function VoiceLibrary({
                     </Button>
                   </div>
                 ) : filteredVoices.length === 0 ? (
-                  <div className="text-sm text-muted">
+                  <div className="text-sm text-white/70">
                     No voices match your filter or search. Try &quot;All&quot; or clear the search.
                   </div>
                 ) : (
@@ -252,10 +252,10 @@ export function VoiceLibrary({
                           onClose()
                         }}
                         className={cn(
-                          "group flex flex-col items-stretch rounded-xl border border-border bg-canvas/80 hover:bg-white hover:shadow-sm transition-all text-left",
+                          "group flex flex-col items-stretch rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-left",
                           selectedVoiceId === voice.id &&
                             (selectedProvider || voice.provider) === voice.provider
-                            ? "ring-2 ring-brand/50 border-brand/60"
+                            ? "ring-2 ring-[#4DFFCE]/50 border-[#4DFFCE]/60"
                             : ""
                         )}
                       >
@@ -274,26 +274,26 @@ export function VoiceLibrary({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-primary truncate">
+                              <p className="text-sm font-semibold text-white truncate">
                                 {voice.name}
                               </p>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200 shrink-0">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20 shrink-0">
                                 {providerLabel(voice.provider)}
                               </span>
                             </div>
                             {voice.description && (
-                              <p className="mt-1 text-xs text-muted line-clamp-2">
+                              <p className="mt-1 text-xs text-white/70 line-clamp-2">
                                 {voice.description}
                               </p>
                             )}
                             {voice.is_custom && (
-                              <p className="mt-1 text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                              <p className="mt-1 text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                 Custom clone
                               </p>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3 border-t border-dashed border-border/70 mt-3">
+                        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3 border-t border-dashed border-white/10 mt-3">
                           <Button
                             variant="secondary"
                             size="sm"
@@ -365,15 +365,15 @@ function CloneVoiceSection() {
   }
 
   return (
-    <div className="rounded-xl border border-dashed border-border bg-canvas/60 px-4 py-4 flex flex-col gap-3">
+    <div className="rounded-xl border border-dashed border-white/10 bg-white/5 px-4 py-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-primary">Clone a Voice</p>
-          <p className="text-[11px] text-muted">
+          <p className="text-xs font-semibold text-white">Clone a Voice</p>
+          <p className="text-[11px] text-white/70">
             Upload at least 30 seconds of clean speech to create a custom voice.
           </p>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20">
           Chatterbox (offline)
         </span>
       </div>
@@ -383,7 +383,7 @@ function CloneVoiceSection() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Voice name (e.g. Support Voice)"
-          className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand/40"
+          className="form-input flex-1 text-xs py-2"
         />
         <input
           type="file"

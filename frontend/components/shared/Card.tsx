@@ -16,12 +16,12 @@ export function Card({
   return (
     <div
       className={cn(
-        "bg-surface rounded-xl border border-border shadow-card transition-all duration-200",
+        "glass-panel rounded-xl border border-white/10 transition-all duration-200",
         padding === "none" && "p-0",
         padding === "sm" && "p-4",
         padding === "md" && "p-6",
         padding === "lg" && "p-8",
-        hover && "hover:shadow-md hover:border-border/80",
+        hover && "hover:border-[#4DFFCE]/20",
         className
       )}
     >
@@ -51,11 +51,11 @@ export function CardHeader({
       )}
     >
       <div>
-        <h3 className="text-base font-semibold text-primary tracking-tight">
+        <h3 className="text-base font-semibold text-white tracking-tight">
           {title}
         </h3>
         {subtitle && (
-          <p className="text-sm text-muted mt-0.5 leading-relaxed">
+          <p className="text-sm text-white/50 mt-0.5 leading-relaxed">
             {subtitle}
           </p>
         )}

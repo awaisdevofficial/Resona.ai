@@ -7,7 +7,6 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { api } from "@/lib/api";
 import { cn } from "@/components/lib-utils";
@@ -76,22 +75,23 @@ export default function WebhooksPage() {
   };
 
   return (
-    <div className="animate-route-in">
+    <div className="animate-fade-in">
       <PageHeader
         title="Webhooks"
         subtitle="Receive call and agent events at your endpoint"
         actions={
-          <Button variant="primary" size="md" onClick={() => setShowForm(true)}>
-            <Plus size={14} className="mr-1.5" />
+          <button type="button" onClick={() => setShowForm(true)} className="btn-primary">
+            <Plus size={16} />
             Add webhook
-          </Button>
+          </button>
         }
       />
 
-      <div className="bg-info/10 border border-info/20 rounded-card p-5 mb-6 text-body text-info font-medium leading-relaxed">
-        Configure webhooks to receive real-time notifications when calls start,
-        end, or when transcripts are generated. Your endpoint must accept POST
-        requests and respond with 2xx.
+      <div className="glass-panel-sm p-4 mb-6 border-l-2 border-l-[#4DFFCE]/50">
+        <p className="text-sm text-white/80">
+          Webhooks send POST requests to your endpoint when selected events occur.
+          Your endpoint should respond with a 2xx status code.
+        </p>
       </div>
 
       <AnimatePresence>
@@ -100,62 +100,61 @@ export default function WebhooksPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-surface border border-border rounded-card shadow-card p-6 mb-6 overflow-hidden"
+            className="glass-card p-6 mb-6 overflow-hidden animate-fade-in"
           >
-            <h3 className="text-section-title text-text-primary mb-4">
-              New webhook
-            </h3>
+            <h3 className="text-lg font-medium text-white mb-4">New Webhook</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-label text-text-secondary mb-1.5">
-                  URL
-                </label>
+                <label className="form-label">Webhook URL</label>
                 <input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://your-server.com/webhook"
-                  className="w-full px-3 py-2.5 border border-border rounded-input text-body font-mono bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  placeholder="https://api.yourapp.com/webhooks/resona"
+                  className="form-input font-mono"
                 />
               </div>
               <div>
-                <label className="block text-label text-text-secondary mb-2">
-                  Events
-                </label>
-                <div className="flex flex-wrap gap-3">
+                <label className="form-label">Events</label>
+                <div className="flex flex-wrap gap-2">
                   {WEBHOOK_EVENTS.map((ev) => (
-                    <label
+                    <button
                       key={ev}
-                      className="flex items-center gap-2 text-body cursor-pointer"
+                      type="button"
+                      onClick={() => toggleEvent(ev)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                        events.includes(ev)
+                          ? "bg-[#4DFFCE]/20 text-[#4DFFCE] border border-[#4DFFCE]/30"
+                          : "bg-white/5 text-white/60 border border-transparent hover:bg-white/10"
+                      )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={events.includes(ev)}
-                        onChange={() => toggleEvent(ev)}
-                        className="rounded border-border text-brand focus:ring-brand/30"
-                      />
-                      <span className="text-text-primary">{ev}</span>
-                    </label>
+                      {events.includes(ev) && "✓ "}
+                      {ev}
+                    </button>
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="primary"
-                  onClick={submit}
-                  disabled={!url.trim() || create.isPending}
-                >
-                  {create.isPending ? "Creating..." : "Create"}
-                </Button>
-                <Button
-                  variant="secondary"
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
                   onClick={() => {
                     setShowForm(false);
                     setUrl("");
                     setEvents([]);
                   }}
+                  className="btn-secondary"
                 >
                   Cancel
-                </Button>
+                </button>
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={!url.trim() || create.isPending}
+                  className="btn-primary"
+                >
+                  <Plus size={16} />
+                  {create.isPending ? "Creating..." : "Create"}
+                </button>
               </div>
             </div>
           </motion.div>
@@ -165,42 +164,38 @@ export default function WebhooksPage() {
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 rounded-card bg-surface border border-border shadow-card animate-pulse"
-            />
+            <div key={i} className="h-16 glass-card animate-pulse" />
           ))}
         </div>
       ) : !webhooks?.length ? (
-        <div className="bg-surface rounded-card border border-border shadow-card">
-          <EmptyState
-            title="No webhooks yet"
-            description="Add a webhook to receive call and agent events at your endpoint."
-            action={{
-              label: "Add webhook",
-              onClick: () => setShowForm(true),
-            }}
-          />
-        </div>
+        <EmptyState
+          title="No webhooks yet"
+          description="Add a webhook to receive call and agent events at your endpoint."
+          action={
+            <button type="button" className="btn-primary" onClick={() => setShowForm(true)}>
+              Add webhook
+            </button>
+          }
+        />
       ) : (
-        <div className="bg-surface rounded-card border border-border shadow-card overflow-hidden">
+        <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-border bg-background/50">
-                  <th className="text-left px-4 py-3 text-label uppercase tracking-wide text-text-muted">
+                <tr className="border-b border-white/[0.06]">
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide text-white/70">
                     URL
                   </th>
-                  <th className="text-left px-4 py-3 text-label uppercase tracking-wide text-text-muted">
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide text-white/70">
                     Events
                   </th>
-                  <th className="text-left px-4 py-3 text-label uppercase tracking-wide text-text-muted">
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide text-white/70">
                     Last triggered
                   </th>
-                  <th className="text-left px-4 py-3 text-label uppercase tracking-wide text-text-muted w-20">
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide text-white/70 w-20">
                     Status
                   </th>
-                  <th className="text-right px-4 py-3 text-label uppercase tracking-wide text-text-muted">
+                  <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide text-white/70">
                     Actions
                   </th>
                 </tr>
@@ -209,17 +204,17 @@ export default function WebhooksPage() {
                 {webhooks.map((wh) => (
                   <tr
                     key={wh.id}
-                    className="border-b border-border last:border-0 hover:bg-background/50 transition-colors"
+                    className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.03] transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-body text-text-primary truncate max-w-xs">
+                    <td className="px-4 py-3 font-mono text-sm text-white truncate max-w-xs">
                       {wh.url}
                     </td>
-                    <td className="px-4 py-3 text-body">
+                    <td className="px-4 py-3 text-sm">
                       <div className="flex flex-wrap gap-1">
                         {wh.events?.map((ev) => (
                           <span
                             key={ev}
-                            className="inline-flex rounded-badge px-2 py-0.5 text-label font-medium bg-brand/10 text-brand border border-brand/20"
+                            className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-[#4DFFCE]/15 text-[#4DFFCE]"
                           >
                             {ev}
                           </span>
@@ -227,13 +222,13 @@ export default function WebhooksPage() {
                         {(!wh.events || wh.events.length === 0) && "—"}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-label text-text-muted">
+                    <td className="px-4 py-3 text-xs text-white/70">
                       {wh.last_status != null ? (
                         <span
                           className={
                             wh.last_status >= 200 && wh.last_status < 300
-                              ? "text-success"
-                              : "text-error"
+                              ? "text-[#4DFFCE]"
+                              : "text-red-400"
                           }
                         >
                           {wh.last_status}
@@ -246,7 +241,7 @@ export default function WebhooksPage() {
                       <span
                         className={cn(
                           "inline-flex h-2 w-2 rounded-full",
-                          wh.is_active ? "bg-success" : "bg-text-muted"
+                          wh.is_active ? "bg-[#4DFFCE]" : "bg-white/40"
                         )}
                         title={wh.is_active ? "Active" : "Inactive"}
                       />
@@ -263,7 +258,7 @@ export default function WebhooksPage() {
                             remove.mutate(wh.id);
                           }
                         }}
-                        className="p-1.5 rounded-button text-text-muted hover:text-error hover:bg-red-50 transition-colors"
+                        className="p-1.5 rounded-lg text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                       >
                         <Trash2 size={14} />
                       </button>

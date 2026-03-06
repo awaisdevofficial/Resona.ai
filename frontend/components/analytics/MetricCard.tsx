@@ -70,7 +70,7 @@ export function MetricCard({
         )}
       </div>
       {subtitle && (
-        <p className="text-xs text-white/50 mt-2">{subtitle}</p>
+        <p className="text-xs text-white/70 mt-2">{subtitle}</p>
       )}
     </div>
   );

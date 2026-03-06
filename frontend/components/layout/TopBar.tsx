@@ -38,6 +38,10 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
     title: "Settings",
     subtitle: "Manage your account and integrations",
   },
+  "/documentation": {
+    title: "Documentation",
+    subtitle: "How Resona works and API reference",
+  },
 };
 
 function getPageInfo(pathname: string): { title: string; subtitle?: string } {
@@ -94,7 +98,7 @@ export function TopBar({ onMenuClick, className }: TopBarProps) {
             {pageInfo.title}
           </h1>
           {pageInfo.subtitle && (
-            <p className="hidden sm:block text-xs text-white/50">
+            <p className="hidden sm:block text-xs text-white/70">
               {pageInfo.subtitle}
             </p>
           )}

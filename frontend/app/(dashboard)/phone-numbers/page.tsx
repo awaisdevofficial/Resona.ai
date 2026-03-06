@@ -13,7 +13,7 @@ export default function PhoneNumbersRedirect() {
     router.replace("/settings");
   }, [router]);
   return (
-    <div className="flex items-center justify-center min-h-[200px] text-text-muted">
+    <div className="flex items-center justify-center min-h-[200px] text-white/70">
       Redirecting to Settings…
     </div>
   );

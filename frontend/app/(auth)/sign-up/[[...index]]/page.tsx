@@ -39,7 +39,7 @@ export default function SignUpPage() {
             <h1 className="text-2xl font-semibold text-white mb-2">
               Create account
             </h1>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-white/70">
               Sign up with your email and a password.
             </p>
           </div>
@@ -90,7 +90,7 @@ export default function SignUpPage() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-white/50 mt-6">
+          <p className="text-center text-sm text-white/70 mt-6">
             Already have an account?{" "}
             <Link href="/sign-in" className="text-[#4DFFCE] hover:underline">
               Sign in

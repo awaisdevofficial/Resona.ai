@@ -103,10 +103,8 @@ export function Sidebar({
           icon={Settings}
           collapsed={collapsed}
         />
-        <a
-          href="https://docs.resona.ai"
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          href="/documentation"
           className={cn(
             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60",
             "hover:bg-white/5 hover:text-white transition-all duration-200",
@@ -114,13 +112,8 @@ export function Sidebar({
           )}
         >
           <BookOpen size={18} />
-          {!collapsed && (
-            <>
-              <span>Documentation</span>
-              <span className="ml-auto opacity-50">↗</span>
-            </>
-          )}
-        </a>
+          {!collapsed && <span>Documentation</span>}
+        </Link>
         <UserFooter collapsed={collapsed} />
       </div>
     </aside>

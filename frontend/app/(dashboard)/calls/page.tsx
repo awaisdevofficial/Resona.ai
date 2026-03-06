@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownLeft,
@@ -18,7 +19,6 @@ import { formatDistanceToNow } from "date-fns";
 
 import { CallStatusBadge } from "@/components/calls/CallStatusBadge";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import { cn } from "@/components/lib-utils";
 
@@ -94,16 +94,6 @@ export default function CallsPage() {
   });
 
   const items = (calls as any[]) ?? [];
-  const totalCalls = items.length;
-  const completedCalls = items.filter((c: any) => c.status === "completed").length;
-  const failedCalls = items.filter((c: any) => c.status === "failed").length;
-  const totalDurationSeconds = items.reduce(
-    (acc: number, c: any) => acc + (c.duration_seconds || 0),
-    0
-  );
-  const avgDurationSeconds = totalCalls
-    ? Math.round(totalDurationSeconds / totalCalls)
-    : 0;
 
   const hasActiveFilters =
     Boolean(filters.direction) ||
@@ -111,13 +101,13 @@ export default function CallsPage() {
     Boolean(filters.agentId);
 
   return (
-    <div className="animate-route-in">
+    <div className="animate-fade-in">
       <PageHeader
         title="Calls"
         subtitle="Review recent calls. Filter by direction and status, then open the transcript for any call."
         actions={
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex rounded-button border border-border bg-surface p-0.5 shadow-sm">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-white/5">
               {[
                 { id: "7", label: "7d" },
                 { id: "30", label: "30d" },
@@ -128,34 +118,34 @@ export default function CallsPage() {
                   type="button"
                   onClick={() => setDateRange(opt.id as "7" | "30" | "90")}
                   className={cn(
-                    "px-3 py-1.5 text-label font-medium rounded-md transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-inset",
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                     dateRange === opt.id
-                      ? "bg-brand text-white border-0"
-                      : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                      ? "bg-[#4DFFCE]/20 text-[#4DFFCE] border border-[#4DFFCE]/40"
+                      : "text-white/70 hover:text-white border border-transparent"
                   )}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <Button
-              variant="primary"
-              size="md"
+            <button
+              type="button"
               onClick={() => setOutboundModal(true)}
+              className="btn-primary"
             >
-              <Phone size={14} className="mr-1.5" />
+              <Phone size={16} />
               New Call
-            </Button>
+            </button>
           </div>
         }
       />
 
       {!phoneNumbersLoading && !telephonyStatus?.is_connected && !(phoneNumbers as any[])?.length && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-card p-4 mb-6 text-body text-amber-800 dark:text-amber-200">
+        <div className="glass-panel-sm p-4 mb-6 border-l-2 border-l-amber-500/50 text-sm text-amber-400">
           <p className="font-medium mb-1">Connect your phone number</p>
-          <p className="text-text-secondary text-sm">
+          <p className="text-white/60">
             To make and receive calls, connect your Twilio account and number in{" "}
-            <Link href="/settings" className="underline font-medium text-brand hover:no-underline">
+            <Link href="/settings" className="underline font-medium text-[#4DFFCE] hover:no-underline">
               Settings → Integrations
             </Link>
             . Resona will set up the SIP trunk and routing automatically.
@@ -163,35 +153,9 @@ export default function CallsPage() {
         </div>
       )}
 
-      {!isLoading && !!items.length && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <StatCard label="Total calls" value={totalCalls.toLocaleString()} />
-          <StatCard
-            label="Completion rate"
-            value={
-              totalCalls
-                ? `${Math.round((completedCalls / totalCalls) * 100)}%`
-                : "—"
-            }
-            helperText={`${completedCalls} completed • ${failedCalls} failed`}
-          />
-          <StatCard
-            label="Avg. duration"
-            value={
-              avgDurationSeconds ? formatDuration(avgDurationSeconds) : "—"
-            }
-            helperText={
-              totalDurationSeconds
-                ? `${formatDuration(totalDurationSeconds)} total`
-                : undefined
-            }
-          />
-        </div>
-      )}
-
       <div className="w-full">
-        <div className="bg-surface rounded-card border border-border shadow-card overflow-hidden">
-          <div className="px-4 pt-4 pb-3 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/50">
+        <div className="glass-card overflow-hidden">
+          <div className="px-4 pt-4 pb-3 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06]">
             <div className="flex flex-wrap items-center gap-2">
               <FilterPill
                 label="All"
@@ -234,40 +198,39 @@ export default function CallsPage() {
               />
             </div>
             {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => {
                   setFilters({});
                   setSelected(null);
                 }}
-                className="text-label"
+                className="btn-ghost text-xs"
               >
                 Clear filters
-              </Button>
+              </button>
             )}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
-              <thead className="bg-background/70 border-b border-border">
+              <thead className="border-b border-white/[0.06]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-white/70">
                     Date / time
                   </th>
-                  <th className="px-4 py-3 text-left text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-white/70">
                     Agent
                   </th>
-                  <th className="px-4 py-3 text-left text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-white/70">
                     Direction
                   </th>
-                  <th className="px-4 py-3 text-left text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-white/70">
                     Duration
                   </th>
-                  <th className="px-4 py-3 text-left text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-white/70">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-right text-label uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-white/70">
                     Actions
                   </th>
                 </tr>
@@ -275,9 +238,9 @@ export default function CallsPage() {
               <tbody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-border">
+                    <tr key={i} className="border-b border-white/[0.06]">
                       <td colSpan={6} className="px-4 py-4">
-                        <div className="h-5 rounded bg-background animate-pulse" />
+                        <div className="h-5 rounded bg-white/10 animate-pulse" />
                       </td>
                     </tr>
                   ))
@@ -285,7 +248,7 @@ export default function CallsPage() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-4 py-12 text-center text-body text-text-muted"
+                      className="px-4 py-12 text-center text-sm text-white/70"
                     >
                       No calls yet.
                     </td>
@@ -312,11 +275,11 @@ export default function CallsPage() {
                       <tr
                         key={call.id}
                         className={cn(
-                          "border-b border-border transition-colors",
-                          isSelected ? "bg-brand/5" : "odd:bg-surface even:bg-background/30 hover:bg-background/50"
+                          "border-b border-white/[0.06] transition-colors hover:bg-white/[0.03]",
+                          isSelected && "bg-[#4DFFCE]/5"
                         )}
                       >
-                        <td className="px-4 py-3 text-body text-text-primary whitespace-nowrap">
+                        <td className="px-4 py-3 text-sm text-white whitespace-nowrap">
                           {createdAt ? (
                             <span title={createdAt.toISOString()}>
                               {formatDistanceToNow(createdAt, {
@@ -327,27 +290,21 @@ export default function CallsPage() {
                             "—"
                           )}
                         </td>
-                        <td className="px-4 py-3 text-body font-medium text-text-primary max-w-[160px] truncate">
+                        <td className="px-4 py-3 text-sm font-medium text-white max-w-[160px] truncate">
                           {agentName}
                         </td>
-                        <td className="px-4 py-3 text-body">
-                          <span className="inline-flex items-center gap-1.5 rounded-badge px-2 py-0.5 text-label font-medium border bg-surface">
+                        <td className="px-4 py-3 text-sm">
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-white/10 text-white/80">
                             {isInbound ? (
-                              <ArrowDownLeft
-                                size={14}
-                                className="text-success"
-                              />
+                              <ArrowDownLeft size={14} className="text-[#4DFFCE]" />
                             ) : (
-                              <ArrowUpRight
-                                size={14}
-                                className="text-info"
-                              />
+                              <ArrowUpRight size={14} className="text-[#60A5FA]" />
                             )}
                             <span className="capitalize">{direction}</span>
                             <CallTypeBadge type={callType} />
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-body font-medium text-text-primary">
+                        <td className="px-4 py-3 text-sm font-medium text-white">
                           {call.duration_seconds
                             ? formatDuration(call.duration_seconds)
                             : "—"}
@@ -356,13 +313,13 @@ export default function CallsPage() {
                           <CallStatusBadge status={call.status} />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button
-                            variant="secondary"
-                            size="sm"
+                          <button
+                            type="button"
                             onClick={() => setSelected(call)}
+                            className="btn-secondary text-sm py-1.5 px-3"
                           >
                             View
-                          </Button>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -396,54 +353,52 @@ export default function CallsPage() {
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="w-full max-w-sm bg-surface border border-border rounded-2xl shadow-modal p-5 pointer-events-auto"
+                className="w-full max-w-sm glass-card p-5 pointer-events-auto"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 onClick={(e) => e.stopPropagation()}
               >
-              <h3 className="text-section-title text-text-primary mb-4">
+              <h3 className="text-lg font-semibold text-white mb-4">
                 New outbound call
               </h3>
 
               {!phoneNumbers?.length ? (
                 <div className="space-y-4">
-                  <p className="text-body text-text-secondary">
+                  <p className="text-sm text-white/70">
                     Import your own number first to make and receive calls.
                     Add Twilio credentials in Settings, then import your numbers.
                   </p>
                   <div className="flex flex-col gap-2">
-                    <Button
-                      variant="primary"
-                      className="w-full"
+                    <button
+                      type="button"
+                      className="btn-primary w-full"
                       onClick={() => importNumbers.mutate()}
                       disabled={importNumbers.isPending}
                     >
                       {importNumbers.isPending ? "Importing…" : "Import from Twilio"}
-                    </Button>
+                    </button>
                     <Link href="/settings" onClick={() => setOutboundModal(false)}>
-                      <Button variant="secondary" className="w-full">
+                      <button type="button" className="btn-secondary w-full">
                         Go to Settings → Integrations
-                      </Button>
+                      </button>
                     </Link>
                   </div>
                   <div className="flex justify-end pt-2">
-                    <Button variant="ghost" onClick={() => setOutboundModal(false)}>
+                    <button type="button" className="btn-ghost" onClick={() => setOutboundModal(false)}>
                       Cancel
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-label text-text-secondary mb-1.5">
-                        Agent
-                      </label>
+                      <label className="form-label">Agent</label>
                       <select
                         value={outboundAgent}
                         onChange={(e) => setOutboundAgent(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-border rounded-input text-body bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        className="form-input"
                       >
                         <option value="">Select an agent</option>
                         {(agents as any[])?.map((agent: any) => (
@@ -458,18 +413,18 @@ export default function CallsPage() {
                         (n: any) => n.agent_id === outboundAgent
                       );
                       return (
-                        <div className="rounded-card bg-background/50 border border-border px-3 py-2.5">
+                        <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
                           {fromNumber ? (
-                            <p className="text-label text-text-secondary">
+                            <p className="text-sm text-white/70">
                               Calling from{" "}
-                              <span className="font-mono font-medium text-text-primary">
+                              <span className="font-mono font-medium text-white">
                                 {fromNumber.number}
                               </span>
                             </p>
                           ) : (
-                            <p className="text-label text-amber-600 dark:text-amber-400">
+                            <p className="text-sm text-amber-400">
                               This agent has no number assigned. Assign one in{" "}
-                              <Link href="/settings" className="underline font-medium">
+                              <Link href="/settings" className="underline font-medium text-[#4DFFCE]">
                                 Settings → Integrations
                               </Link>
                               .
@@ -479,32 +434,30 @@ export default function CallsPage() {
                       );
                     })()}
                     <div>
-                      <label className="block text-label text-text-secondary mb-1.5">
-                        Phone number to call
-                      </label>
+                      <label className="form-label">Phone number to call</label>
                       <input
                         type="tel"
                         value={outboundNumber}
                         onChange={(e) => setOutboundNumber(e.target.value)}
                         placeholder="+1234567890"
-                        className="w-full px-3 py-2.5 border border-border rounded-input text-body bg-surface placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        className="form-input"
                       />
-                      <p className="text-label text-text-muted mt-1">
+                      <p className="text-xs text-white/65 mt-1">
                         Include country code (e.g. +12025551234)
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2 pt-4">
-                    <Button
-                      variant="secondary"
-                      className="flex-1"
+                    <button
+                      type="button"
+                      className="btn-secondary flex-1"
                       onClick={() => setOutboundModal(false)}
                     >
                       Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      className="flex-1"
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary flex-1"
                       onClick={() => {
                         if (!outboundAgent || !outboundNumber.trim()) {
                           toast.error(
@@ -529,7 +482,7 @@ export default function CallsPage() {
                       disabled={outboundCall.isPending}
                     >
                       {outboundCall.isPending ? "Starting…" : "Start Call"}
-                    </Button>
+                    </button>
                   </div>
                 </>
               )}
@@ -554,28 +507,6 @@ function getCallType(call: any): "web_test" | "phone" {
   return "phone";
 }
 
-function StatCard({
-  label,
-  value,
-  helperText,
-}: {
-  label: string;
-  value: string;
-  helperText?: string;
-}) {
-  return (
-    <div className="bg-surface rounded-card border border-border shadow-card px-4 py-3 flex flex-col gap-0.5">
-      <p className="text-label font-semibold text-text-muted uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="text-stat-number text-text-primary">{value}</p>
-      {helperText && (
-        <p className="text-body text-text-muted mt-0.5">{helperText}</p>
-      )}
-    </div>
-  );
-}
-
 function FilterPill({
   label,
   isActive,
@@ -590,10 +521,10 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center rounded-button px-3 py-1.5 text-label font-medium border transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-1 active:scale-[0.98]",
+        "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
         isActive
-          ? "bg-brand text-white border-brand shadow-sm"
-          : "bg-surface text-text-muted border-border hover:bg-background hover:text-text-primary hover:border-border"
+          ? "bg-[#4DFFCE]/20 text-[#4DFFCE] border border-[#4DFFCE]/40"
+          : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-transparent"
       )}
     >
       {label}
@@ -607,10 +538,10 @@ function CallTypeBadge({ type }: { type: "web_test" | "phone" }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-[10px] font-medium border",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
         isTest
-          ? "bg-brand/10 text-brand border-brand/20"
-          : "bg-success/10 text-success border-success/20"
+          ? "bg-[#4DFFCE]/15 text-[#4DFFCE]"
+          : "bg-emerald-500/15 text-emerald-400"
       )}
     >
       {isTest ? <Beaker size={11} /> : <PhoneCall size={11} />}
@@ -626,56 +557,72 @@ function CallDetailDrawer({
   call: any | null;
   onClose: () => void;
 }) {
-  return (
-    <AnimatePresence>
-      {call && (
-        <>
-          <motion.div
-            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-[420px] bg-surface border-l border-border shadow-modal flex flex-col"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 280, damping: 30 }}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+  const [isEntering, setIsEntering] = useState(true);
+
+  useEffect(() => {
+    if (!call) return;
+    setIsEntering(true);
+    const t = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsEntering(false));
+    });
+    return () => cancelAnimationFrame(t);
+  }, [call?.id]);
+
+  if (!call || typeof document === "undefined") return null;
+
+  const open = true;
+  const overlay = (
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClose}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+        className={cn(
+          "fixed inset-0 z-40 transition-opacity duration-300 ease-out",
+          "bg-black/40 backdrop-blur-[4px]",
+          "opacity-100 pointer-events-auto"
+        )}
+        aria-label="Close call details"
+      />
+      <div
+        className={cn(
+          "fixed top-0 right-0 bottom-0 z-50 flex flex-col w-full max-w-[420px] min-w-0 h-screen min-h-screen",
+          "bg-[#0B0D10] border-l border-white/10 shadow-[-8px_0_32px_rgba(0,0,0,0.5)]",
+          "transition-[transform,opacity] duration-350 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform",
+          open && !isEntering ? "translate-x-0 opacity-100" : "translate-x-full opacity-95"
+        )}
+      >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div>
-                <p className="text-label text-text-muted uppercase tracking-wide mb-0.5">
+                <p className="text-xs text-white/70 uppercase tracking-wide mb-0.5">
                   Call details
                 </p>
-                <p className="text-section-title text-text-primary">
+                <p className="text-base font-semibold text-white">
                   {call.metadata?.agent_name || "Unknown agent"}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-button hover:bg-background text-text-muted transition-colors"
+                className="p-2 rounded-lg hover:bg-white/10 text-white/70 transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
-              <div className="rounded-card bg-brand/5 border border-border px-3 py-3">
+              <div className="rounded-xl bg-[#4DFFCE]/5 border border-[#4DFFCE]/20 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-label text-text-muted uppercase tracking-wide mb-1">
-                      {call.direction === "inbound"
-                        ? "Inbound"
-                        : "Outbound"}
+                    <p className="text-xs text-white/70 uppercase tracking-wide mb-1">
+                      {call.direction === "inbound" ? "Inbound" : "Outbound"}
                     </p>
-                    <p className="text-body font-semibold text-text-primary flex items-center gap-1.5">
-                      <Phone size={14} className="text-brand" />
+                    <p className="text-sm font-semibold text-white flex items-center gap-1.5">
+                      <Phone size={14} className="text-[#4DFFCE]" />
                       {call.to_number || call.from_number || "Unknown"}
                     </p>
-                    <p className="text-label text-text-muted mt-1">
+                    <p className="text-xs text-white/70 mt-1">
                       From {call.from_number || "—"} to {call.to_number || "—"}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -684,22 +631,22 @@ function CallDetailDrawer({
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <CallStatusBadge status={call.status} />
-                    <div className="flex items-center gap-1.5 text-label text-text-muted">
+                    <div className="flex items-center gap-1.5 text-xs text-white/70">
                       <Clock size={12} />
                       {call.created_at
                         ? new Date(call.created_at).toLocaleString()
                         : "—"}
                     </div>
                     {call.duration_seconds && (
-                      <span className="text-label text-text-muted">
+                      <span className="text-xs text-white/70">
                         Duration:{" "}
-                        <span className="font-medium text-text-primary">
+                        <span className="font-medium text-white">
                           {formatDuration(call.duration_seconds)}
                         </span>
                       </span>
                     )}
                     {call.end_reason && (
-                      <span className="text-label text-text-muted text-right max-w-[220px]">
+                      <span className="text-xs text-white/70 text-right max-w-[220px]">
                         End: {call.end_reason}
                       </span>
                     )}
@@ -708,35 +655,32 @@ function CallDetailDrawer({
               </div>
 
               {!call.transcript?.length ? (
-                <div className="rounded-card bg-background/50 border border-dashed border-border py-8 flex items-center justify-center">
-                  <p className="text-body text-text-muted text-center px-4">
+                <div className="rounded-xl bg-white/5 border border-dashed border-white/10 py-8 flex items-center justify-center">
+                  <p className="text-sm text-white/70 text-center px-4">
                     No transcript available yet.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                   {call.transcript.map((turn: any, index: number) => {
-                    const speaker =
-                      turn.speaker ?? turn.role ?? "agent";
+                    const speaker = turn.speaker ?? turn.role ?? "agent";
                     return (
                       <div
                         key={index}
                         className={cn(
                           "flex",
-                          speaker === "agent"
-                            ? "justify-end"
-                            : "justify-start"
+                          speaker === "agent" ? "justify-end" : "justify-start"
                         )}
                       >
                         <div
                           className={cn(
-                            "rounded-button px-3 py-2 text-body max-w-[85%]",
+                            "rounded-xl px-3 py-2 text-sm max-w-[85%]",
                             speaker === "agent"
-                              ? "bg-brand text-white"
-                              : "bg-background text-text-primary border border-border"
+                              ? "bg-[#4DFFCE] text-[#07080A]"
+                              : "bg-white/10 text-white border border-white/10"
                           )}
                         >
-                          <p className="text-label opacity-80 mb-0.5 uppercase">
+                          <p className="text-xs opacity-80 mb-0.5 uppercase">
                             {speaker}
                           </p>
                           <p>{turn.text}</p>
@@ -748,12 +692,12 @@ function CallDetailDrawer({
               )}
 
               {call.analysis && (
-                <div className="rounded-card border border-border bg-background/50 p-4 space-y-3">
-                  <h3 className="text-label font-semibold uppercase tracking-wide text-text-muted">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-white/70">
                     Analysis
                   </h3>
                   {call.analysis.summary && (
-                    <p className="text-body text-text-primary leading-relaxed">
+                    <p className="text-sm text-white leading-relaxed">
                       {call.analysis.summary}
                     </p>
                   )}
@@ -761,29 +705,29 @@ function CallDetailDrawer({
                     {call.analysis.sentiment && (
                       <span
                         className={cn(
-                          "inline-flex rounded-badge px-2.5 py-0.5 text-label font-medium border",
+                          "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
                           call.analysis.sentiment === "positive"
-                            ? "bg-emerald-50 text-success border-emerald-200"
+                            ? "bg-[#4DFFCE]/15 text-[#4DFFCE]"
                             : call.analysis.sentiment === "negative"
-                              ? "bg-red-50 text-error border-red-200"
-                              : "bg-gray-50 text-text-muted border-gray-200"
+                              ? "bg-red-500/15 text-red-400"
+                              : "bg-white/10 text-white/60"
                         )}
                       >
                         {call.analysis.sentiment}
                       </span>
                     )}
                     {call.analysis.intent && (
-                      <span className="text-label text-text-muted">
+                      <span className="text-xs text-white/70">
                         Intent:{" "}
-                        <span className="font-medium text-text-primary">
+                        <span className="font-medium text-white">
                           {call.analysis.intent}
                         </span>
                       </span>
                     )}
                     {call.analysis.outcome && (
-                      <span className="text-label text-text-muted">
+                      <span className="text-xs text-white/70">
                         Outcome:{" "}
-                        <span className="font-medium text-text-primary">
+                        <span className="font-medium text-white">
                           {call.analysis.outcome}
                         </span>
                       </span>
@@ -792,9 +736,9 @@ function CallDetailDrawer({
                 </div>
               )}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+      </div>
+    </>
   );
+
+  return createPortal(overlay, document.body);
 }

@@ -136,7 +136,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -159,7 +159,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                         placeholder="+12025551234"
                         className="form-input font-mono"
                       />
-                      <p className="text-xs text-white/40 mt-1">
+                      <p className="text-xs text-white/65 mt-1">
                         E.164 format with country code
                       </p>
                     </div>
@@ -245,7 +245,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                         placeholder="+12025551234"
                         className="form-input font-mono"
                       />
-                      <p className="text-xs text-white/40 mt-1">
+                      <p className="text-xs text-white/65 mt-1">
                         Include country code. Example: +12025551234
                       </p>
                     </div>

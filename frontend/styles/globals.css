@@ -176,7 +176,7 @@
   }
 
   .metric-label {
-    @apply text-xs font-medium uppercase tracking-wider text-white/50;
+    @apply text-xs font-medium uppercase tracking-wider text-white/65;
   }
 
   .metric-value {
@@ -184,11 +184,18 @@
   }
 
   .form-input {
-    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 transition-all duration-200;
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/55 transition-all duration-200;
   }
 
   .form-input:focus {
     @apply border-[#4DFFCE]/50 bg-white/[0.07] outline-none ring-1 ring-[#4DFFCE]/30;
+  }
+
+  /* Dark theme for native select options (where supported) */
+  select.form-input,
+  select.form-input option {
+    background-color: #0B0D10;
+    color: #fff;
   }
 
   .form-label {
@@ -200,7 +207,7 @@
   }
 
   .section-subtitle {
-    @apply text-sm text-white/60;
+    @apply text-sm text-white/70;
   }
 }
 

@@ -38,7 +38,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
       <button
         type="button"
         onClick={handleLogout}
-        className="w-full flex items-center justify-center rounded-xl p-2.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors mt-2"
+        className="w-full flex items-center justify-center rounded-xl p-2.5 text-white/70 hover:bg-white/10 hover:text-white transition-colors mt-2"
         title="Log out"
       >
         <LogOut size={18} />
@@ -63,7 +63,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         <button
           type="button"
           onClick={handleLogout}
-          className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+          className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
           title="Log out"
         >
           <LogOut size={16} />
