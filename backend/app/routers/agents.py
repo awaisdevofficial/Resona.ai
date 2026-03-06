@@ -156,6 +156,23 @@ async def create_web_call_token(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    import logging
+    log = logging.getLogger(__name__)
+
+    try:
+        return await _create_web_call_token_impl(agent_id, user, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("web-call-token failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _create_web_call_token_impl(
+    agent_id: uuid.UUID,
+    user: User,
+    db: AsyncSession,
+):
     import json
 
     agent = await db.get(Agent, agent_id)

@@ -47,3 +47,27 @@ Full error line:
 ```bash
 sudo journalctl -u resona-agent -n 200 --no-pager
 ```
+
+## Agent worker issues (test call / web call not connecting)
+
+If the **backend** returns 200 for web-call-token but the **agent never joins** or the call fails:
+
+1. **Worker must connect to the same LiveKit as the backend**
+   - Worker uses `LIVEKIT_URL` (WebSocket), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` from env (e.g. from `backend/.env` or the systemd unit).
+   - On the server, `LIVEKIT_URL` can be the public URL (e.g. `wss://resonaai.duckdns.org/livekit`) or the internal one (e.g. `ws://127.0.0.1:7880`) if the worker runs on the same host as LiveKit. Keys must match the backend and LiveKit server.
+
+2. **Worker needs to reach the backend for internal APIs**
+   - `API_BASE_URL` must be the URL the worker can use to call the backend (e.g. `http://127.0.0.1:8000` or `http://172.31.18.18:8000` when the backend is in Docker on the same host).
+   - `INTERNAL_SECRET` must match the backend’s `INTERNAL_SECRET` for `/internal/*` routes (e.g. transcript, default-agent).
+
+3. **Required API keys in the worker’s env**
+   - `DEEPGRAM_API_KEY` (STT), `GROQ_API_KEY` (LLM), `CARTESIA_API_KEY` (TTS). If any are missing, the worker can accept the job but will error when starting the voice session.
+
+4. **Check worker logs**
+   ```bash
+   sudo journalctl -u resona-agent -n 100 --no-pager
+   ```
+   Look for “Agent job started room=…”, connection errors, or Groq/Deepgram/Cartesia errors.
+
+5. **Systemd env**
+   If the unit doesn’t load `backend/.env`, set the variables in the unit file (e.g. `Environment=LIVEKIT_URL=wss://...`) or use `EnvironmentFile=/opt/resona/app/backend/.env`.
