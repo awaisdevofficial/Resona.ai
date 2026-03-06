@@ -171,20 +171,20 @@ async def entrypoint(ctx: JobContext):
         sample_rate=24000,
     )
 
-    # Turn detection: STT; tune for barge-in (stop when user speaks) and fast response
-    # aec_warmup_duration=0 so interruptions work from the very start (default 3s blocks barge-in)
-    # min_interruption_duration=0.1 so brief user speech stops the agent quickly
-    # false_interruption_timeout=None so we don't auto-resume after interrupt (avoids agent talking over user)
+    # Use VAD for turn detection so we interrupt on voice activity immediately (no wait for STT).
+    # With "stt", interrupt only fired on interim/final transcript, so the agent kept talking.
+    # aec_warmup_duration=0 so barge-in works from the very start.
+    # false_interruption_timeout=None so we don't auto-resume after interrupt.
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
         llm=llm,
         tts=tts,
-        turn_detection="stt",
+        turn_detection="vad",
         allow_interruptions=True,
-        min_endpointing_delay=0.25,
-        max_endpointing_delay=2.0,
-        min_interruption_duration=0.1,
+        min_endpointing_delay=0.3,
+        max_endpointing_delay=1.5,
+        min_interruption_duration=0.08,
         min_interruption_words=0,
         preemptive_generation=True,
         aec_warmup_duration=0,

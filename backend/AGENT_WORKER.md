@@ -3,8 +3,9 @@
 ## Voice call behavior (barge-in and response)
 
 - **Interruptions:** The agent stops when you start speaking. Key settings in `agent_worker.py`:
-  - `aec_warmup_duration=0` so barge-in works from the very start (default 3s would block interruptions).
-  - `min_interruption_duration=0.1` so brief user speech triggers a stop.
+  - `turn_detection="vad"` so the agent reacts to voice activity immediately (with `"stt"` it waited for speech-to-text, so it often finished its sentence first).
+  - `aec_warmup_duration=0` so barge-in works from the very start.
+  - `min_interruption_duration=0.08` so brief user speech triggers a stop.
   - `false_interruption_timeout=None` and `resume_false_interruption=False` so the agent does not auto-resume after you interrupt.
 - **Fast response:** `preemptive_generation=True` and short prompts keep replies quick. If the agent still doesn’t stop when you speak, check that only one worker is running and that the user’s mic is unmuted in the test call UI.
 
