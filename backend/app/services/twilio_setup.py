@@ -79,7 +79,7 @@ class TwilioSetupService:
             logger.info("Created credential list %s with credential", credential_list_sid)
 
             # 4. Attach credential list to trunk (termination auth)
-            self._client.trunking.v1.trunks(trunk_sid).credential_lists.create(
+            self._client.trunking.v1.trunks(trunk_sid).termination.credential_list_mappings.create(
                 credential_list_sid=credential_list_sid
             )
             logger.info("Attached credential list to trunk %s", trunk_sid)
