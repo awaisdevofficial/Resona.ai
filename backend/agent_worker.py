@@ -211,7 +211,6 @@ async def entrypoint(ctx: JobContext):
         min_interruption_words=0,
         min_endpointing_delay=0.5,
         max_endpointing_delay=2.5,
-        aec_warmup_duration=1.0,
     )
 
     @session.on("user_input_transcribed")
