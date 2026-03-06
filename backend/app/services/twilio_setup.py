@@ -17,15 +17,16 @@ logger = logging.getLogger(__name__)
 
 def _make_twilio_password() -> str:
     """Generate a password that meets Twilio rules: min 12 chars, 1 digit, mixed case."""
-    alphabet = string.ascii_letters + string.digits
-    base = "".join(secrets.choice(alphabet) for _ in range(11))
-    if not any(c.isdigit() for c in base):
-        base = base[:-1] + secrets.choice(string.digits)
-    if not any(c.isupper() for c in base):
-        base = base[:-1] + secrets.choice(string.ascii_uppercase)
-    if not any(c.islower() for c in base):
-        base = base[:-1] + secrets.choice(string.ascii_lowercase)
-    return base
+    guaranteed = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(string.digits),
+    ]
+    rest = [secrets.choice(string.ascii_letters + string.digits) for _ in range(10)]
+    combined = guaranteed + rest
+    secrets.SystemRandom().shuffle(combined)
+    return "".join(combined)
 
 
 class TwilioSetupService:
