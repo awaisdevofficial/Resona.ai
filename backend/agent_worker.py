@@ -201,8 +201,7 @@ async def entrypoint(ctx: JobContext):
             api_key=deepgram_key,
         )
 
-    # Turn detection: use STT so we react to speech quickly (Deepgram has endpointing_ms=25).
-    # Short AEC warmup so user can barge-in soon; tighter endpointing for faster turn-taking.
+    # Turn detection: use STT (livekit-agents 1.5.x; optional tuning params removed for API compatibility)
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         stt=stt,
@@ -210,12 +209,6 @@ async def entrypoint(ctx: JobContext):
         tts=tts,
         turn_detection="stt",
         allow_interruptions=True,
-        min_endpointing_delay=0.25,
-        max_endpointing_delay=2.0,
-        min_interruption_duration=0.2,
-        min_interruption_words=0,
-        aec_warmup_duration=0.5,
-        preemptive_generation=True,
     )
 
     @session.on("user_input_transcribed")
