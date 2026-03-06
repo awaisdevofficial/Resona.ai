@@ -46,7 +46,7 @@ class TwilioSetupService:
     def _setup_trunk_sync(self) -> dict:
         """Synchronous trunk setup (run in executor)."""
         friendly_name = f"Resona-{self.phone_number}"
-        cred_list_name = f"Resona-Creds-{self.phone_number}"
+        cred_list_name = f"Resona-Creds-{self.phone_number}-{uuid4().hex[:6]}"
 
         # 1. Create Elastic SIP Trunk
         trunk = self._client.trunking.v1.trunks.create(friendly_name=friendly_name)
@@ -79,10 +79,18 @@ class TwilioSetupService:
             logger.info("Created credential list %s with credential", credential_list_sid)
 
             # 4. Attach credential list to trunk (termination auth)
-            self._client.trunking.v1.trunks(trunk_sid).termination.credential_list_mappings.create(
-                credential_list_sid=credential_list_sid
-            )
-            logger.info("Attached credential list to trunk %s", trunk_sid)
+            try:
+                self._client.trunking.v1.trunks(trunk_sid).credentials_lists.create(
+                    credential_list_sid=credential_list_sid
+                )
+                logger.info("Attached credential list to trunk %s", trunk_sid)
+            except Exception as e:
+                logger.warning(
+                    "Could not attach credential list to trunk %s: %s. "
+                    "Credential list SID, username and password are still saved and used by LiveKit for outbound auth.",
+                    trunk_sid,
+                    e,
+                )
 
             # 5. Associate phone number with trunk: get IncomingPhoneNumber SID then add to trunk
             incoming = self._client.api.accounts(self.account_sid).incoming_phone_numbers.list(
