@@ -143,17 +143,17 @@ async def entrypoint(ctx: JobContext):
     if not groq_key:
         raise RuntimeError("GROQ_API_KEY is required for the LLM. Set it in the environment.")
 
-    # Low-latency STT: interim results, aggressive endpointing, VAD events for fast turn-taking
+    # STT: 200ms endpointing (25ms splits sentences mid-word); no filler_words (faster STT finalization)
     stt = deepgram.STT(
         model=stt_model,
         api_key=deepgram_key,
         language=stt_language or "en-US",
         sample_rate=16000,
         interim_results=True,
-        endpointing_ms=25,
+        endpointing_ms=200,
         no_delay=True,
         vad_events=True,
-        filler_words=True,
+        filler_words=False,
     )
     # LLM: Groq primary; OpenAI as fallback on rate limit (429) or connection errors
     primary_llm = groq.LLM(
@@ -196,10 +196,10 @@ async def entrypoint(ctx: JobContext):
         "tts": tts,
         "turn_detection": "vad",
         "allow_interruptions": True,
-        "min_endpointing_delay": 0.3,
-        "max_endpointing_delay": 1.5,
-        "min_interruption_duration": 0.08,
-        "min_interruption_words": 0,
+        "min_endpointing_delay": 0.1,
+        "max_endpointing_delay": 0.6,
+        "min_interruption_duration": 0.3,
+        "min_interruption_words": 2,
         "preemptive_generation": True,
     }
     # Optional args (supported in livekit-agents 1.5+); skip on older SDK to avoid TypeError
