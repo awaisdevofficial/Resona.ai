@@ -172,25 +172,33 @@ async def entrypoint(ctx: JobContext):
     )
 
     # Use VAD for turn detection so we interrupt on voice activity immediately (no wait for STT).
-    # With "stt", interrupt only fired on interim/final transcript, so the agent kept talking.
-    # aec_warmup_duration=0 so barge-in works from the very start.
-    # false_interruption_timeout=None so we don't auto-resume after interrupt.
-    session = AgentSession(
-        vad=ctx.proc.userdata["vad"],
-        stt=stt,
-        llm=llm,
-        tts=tts,
-        turn_detection="vad",
-        allow_interruptions=True,
-        min_endpointing_delay=0.3,
-        max_endpointing_delay=1.5,
-        min_interruption_duration=0.08,
-        min_interruption_words=0,
-        preemptive_generation=True,
-        aec_warmup_duration=0,
-        false_interruption_timeout=None,
-        resume_false_interruption=False,
-    )
+    # Only pass kwargs supported by the installed livekit-agents version (server may be older).
+    _session_kw: dict = {
+        "vad": ctx.proc.userdata["vad"],
+        "stt": stt,
+        "llm": llm,
+        "tts": tts,
+        "turn_detection": "vad",
+        "allow_interruptions": True,
+        "min_endpointing_delay": 0.3,
+        "max_endpointing_delay": 1.5,
+        "min_interruption_duration": 0.08,
+        "min_interruption_words": 0,
+        "preemptive_generation": True,
+    }
+    # Optional args (supported in livekit-agents 1.5+); skip on older SDK to avoid TypeError
+    try:
+        from inspect import signature
+        sig = signature(AgentSession.__init__)
+        if "aec_warmup_duration" in sig.parameters:
+            _session_kw["aec_warmup_duration"] = 0
+        if "false_interruption_timeout" in sig.parameters:
+            _session_kw["false_interruption_timeout"] = None
+        if "resume_false_interruption" in sig.parameters:
+            _session_kw["resume_false_interruption"] = False
+    except Exception:
+        pass
+    session = AgentSession(**_session_kw)
 
     @session.on("user_input_transcribed")
     def on_user_transcript(event: UserInputTranscribedEvent):
