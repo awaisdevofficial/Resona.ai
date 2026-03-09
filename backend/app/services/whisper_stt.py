@@ -1,5 +1,5 @@
 """
-Whisper STT service: self-hosted Faster-Whisper (OpenAI-compatible transcriptions).
+Whisper STT service: self-hosted Whisper.cpp (OpenAI-compatible transcriptions).
 Uses WHISPER_STT_URL from config.
 """
 import logging
@@ -23,7 +23,7 @@ async def transcribe_audio(
     filename: Optional[str] = None,
 ) -> str:
     """
-    Transcribe audio using self-hosted Whisper (OpenAI-compatible API).
+    Transcribe audio using self-hosted Whisper.cpp (OpenAI-compatible API).
     Returns the transcribed text. On failure logs and returns empty string or raises.
     """
     url = _whisper_base_url()

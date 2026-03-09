@@ -5,21 +5,49 @@ import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { Headphones, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/Button"
-import { api, API_BASE_URL, getAuthToken } from "@/lib/api"
+import { API_BASE_URL, getAuthToken } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
 
-export type VoiceProvider = "kokoro" | "cartesia" | "deepgram"
+export type VoiceProvider = "piper" | "kokoro" | "cartesia" | "deepgram"
 
 export interface Voice {
   id: string
   name: string
   provider: VoiceProvider | string
-  gender?: string | null
-  description?: string | null
-  preview_url?: string | null
+  language?: string
+  language_code?: string
+  country?: string
+  gender?: "male" | "female" | "neutral" | string
+  quality?: "low" | "medium" | "high"
+  description?: string
 }
 
-type TabFilter = "all" | "female" | "male"
+const LANG_FLAGS: Record<string, string> = {
+  en: "🇺🇸",
+  es: "🇪🇸",
+  fr: "🇫🇷",
+  de: "🇩🇪",
+  it: "🇮🇹",
+  pt: "🇧🇷",
+  ar: "🇸🇦",
+  zh: "🇨🇳",
+  ja: "🇯🇵",
+  ko: "🇰🇷",
+  hi: "🇮🇳",
+  ru: "🇷🇺",
+  nl: "🇳🇱",
+  pl: "🇵🇱",
+  tr: "🇹🇷",
+}
+
+const providerLabel: Record<string, string> = {
+  piper: "Piper TTS",
+  kokoro: "Piper TTS",
+  cartesia: "Cartesia",
+  deepgram: "Deepgram",
+}
+
+type TabFilter = "all" | "english" | "other"
 
 interface VoiceLibraryProps {
   open: boolean
@@ -27,6 +55,15 @@ interface VoiceLibraryProps {
   selectedVoiceId: string | null
   selectedProvider: string | null
   onSelect: (voice: Voice) => void
+}
+
+function getProviderLabel(provider: string): string {
+  return providerLabel[provider?.toLowerCase()] ?? provider
+}
+
+function getLangFlag(languageCode?: string): string {
+  const code = (languageCode || "").split("_")[0].split("-")[0].toLowerCase()
+  return LANG_FLAGS[code] ?? "🌐"
 }
 
 export function VoiceLibrary({
@@ -38,6 +75,7 @@ export function VoiceLibrary({
 }: VoiceLibraryProps) {
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState<TabFilter>("all")
+  const [languageFilter, setLanguageFilter] = useState<string>("all")
   const [previewingId, setPreviewingId] = useState<string | null>(null)
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
@@ -49,7 +87,14 @@ export function VoiceLibrary({
     refetch,
   } = useQuery({
     queryKey: ["voices"],
-    queryFn: () => api.get("/v1/voices") as Promise<Voice[]>,
+    queryFn: async () => {
+      const token = await getAuthToken()
+      const res = await fetch(`${API_BASE_URL}/v1/voices`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!res.ok) throw new Error("Failed to fetch voices")
+      return res.json() as Promise<Voice[]>
+    },
     enabled: open,
     retry: 1,
     staleTime: 60_000,
@@ -90,7 +135,7 @@ export function VoiceLibrary({
         },
         body: JSON.stringify({
           voice_id: voice.id,
-          provider: voice.provider || "kokoro",
+          provider: voice.provider || "piper",
           text: "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
       })
@@ -109,36 +154,50 @@ export function VoiceLibrary({
     }
   }
 
+  const languageOptions = useMemo(() => {
+    const langCount = new Map<string, number>()
+    for (const v of voices) {
+      const lang = v.language || "Unknown"
+      langCount.set(lang, (langCount.get(lang) || 0) + 1)
+    }
+    return Array.from(langCount.entries())
+      .map(([lang, count]) => ({ lang, count }))
+      .sort((a, b) => a.lang.localeCompare(b.lang))
+  }, [voices])
+
   const filteredVoices = useMemo(() => {
     return voices.filter((v) => {
-      if (tab === "female" && v.gender?.toLowerCase() !== "female") return false
-      if (tab === "male" && v.gender?.toLowerCase() !== "male") return false
+      if (tab === "english" && !(v.language_code || "").toLowerCase().startsWith("en")) return false
+      if (tab === "other" && (v.language_code || "").toLowerCase().startsWith("en")) return false
+      if (languageFilter !== "all" && (v.language || "Unknown") !== languageFilter) return false
       if (!search.trim()) return true
       const q = search.toLowerCase()
       return (
-        v.name.toLowerCase().includes(q) ||
-        v.provider.toLowerCase().includes(q) ||
-        (v.description || "").toLowerCase().includes(q)
+        (v.name || "").toLowerCase().includes(q) ||
+        (v.language || "").toLowerCase().includes(q) ||
+        (v.description || "").toLowerCase().includes(q) ||
+        (v.language_code || "").toLowerCase().includes(q)
       )
     })
-  }, [voices, tab, search])
-
-  const voicesByProvider = useMemo(() => {
-    const map = new Map<string, Voice[]>()
-    for (const v of filteredVoices) {
-      const key = (v.provider || "other").toLowerCase()
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(v)
-    }
-    const order = ["kokoro", "cartesia", "deepgram", "other"]
-    return order.filter((p) => map.has(p)).map((p) => ({ provider: p, voices: map.get(p)! }))
-  }, [filteredVoices])
+  }, [voices, tab, languageFilter, search])
 
   const selectedLabel = useMemo(() => {
     if (!selectedVoiceId) return null
     const match = voices.find((v) => v.id === selectedVoiceId && v.provider === (selectedProvider || v.provider))
-    return match ? `${match.name} · ${providerLabel(match.provider)}` : null
+    return match ? `${match.name} · ${getProviderLabel(match.provider)}` : null
   }, [voices, selectedVoiceId, selectedProvider])
+
+  const qualityColor = (quality?: string) => {
+    switch ((quality || "").toLowerCase()) {
+      case "high":
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+      case "medium":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/40"
+      case "low":
+      default:
+        return "bg-white/10 text-white/70 border-white/20"
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -168,7 +227,7 @@ export function VoiceLibrary({
                     Voice library
                   </h2>
                   <p className="text-xs text-white/70 mt-0.5">
-                    Browse voices and choose how your agent should sound. Kokoro is the primary TTS; Cartesia is available as fallback when configured.
+                    Browse Piper and other TTS voices. Filter by language and preview before selecting.
                   </p>
                 </div>
                 <button
@@ -191,29 +250,43 @@ export function VoiceLibrary({
                     <span className="font-medium text-white">{selectedLabel}</span>
                   </div>
                 )}
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search
-                      size={14}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70"
-                    />
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search by name, style, or provider..."
-                      className="form-input pl-8"
-                    />
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <div className="relative flex-1">
+                      <Search
+                        size={14}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70"
+                      />
+                      <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search by name, language, or description..."
+                        className="form-input pl-8 w-full"
+                      />
+                    </div>
+                    <select
+                      value={languageFilter}
+                      onChange={(e) => setLanguageFilter(e.target.value)}
+                      className="form-input min-w-[180px] bg-white/5 border-white/10 text-white"
+                    >
+                      <option value="all">All Languages</option>
+                      {languageOptions.map(({ lang, count }) => (
+                        <option key={lang} value={lang}>
+                          {lang} ({count})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-0.5 text-xs font-medium">
                     {[
-                      { id: "all", label: "All" },
-                      { id: "female", label: "Female" },
-                      { id: "male", label: "Male" },
+                      { id: "all" as TabFilter, label: "All" },
+                      { id: "english" as TabFilter, label: "English" },
+                      { id: "other" as TabFilter, label: "Other Languages" },
                     ].map((t) => (
                       <button
                         key={t.id}
                         type="button"
-                        onClick={() => setTab(t.id as TabFilter)}
+                        onClick={() => setTab(t.id)}
                         className={cn(
                           "px-3 py-1.5 rounded-full transition-colors",
                           tab === t.id
@@ -230,13 +303,18 @@ export function VoiceLibrary({
 
               <div className="p-6 overflow-y-auto space-y-4">
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="text-sm text-white/70">Loading voices…</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div
+                        key={i}
+                        className="h-32 rounded-xl border border-white/10 bg-white/5 animate-pulse"
+                      />
+                    ))}
                   </div>
                 ) : isError ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <p className="text-sm text-red-400">
-                      Could not load voices. {(error as Error)?.message || "Please try again."}
+                      No voices found. {(error as Error)?.message || "Please try again."}
                     </p>
                     <Button variant="secondary" size="sm" onClick={() => refetch()}>
                       Retry
@@ -247,90 +325,81 @@ export function VoiceLibrary({
                     No voices match your filter or search. Try &quot;All&quot; or clear the search.
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    {voicesByProvider.map(({ provider, voices: providerVoices }) => (
-                      <div key={provider}>
-                        <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-3">
-                          {providerLabel(provider)}
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {providerVoices.map((voice) => (
-                            <button
-                              key={`${voice.provider}:${voice.id}`}
-                              type="button"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredVoices.map((voice) => {
+                      const isSelected =
+                        selectedVoiceId === voice.id &&
+                        (selectedProvider || voice.provider) === voice.provider
+                      const genderIcon =
+                        (voice.gender || "").toLowerCase() === "female"
+                          ? "♀"
+                          : (voice.gender || "").toLowerCase() === "male"
+                            ? "♂"
+                            : "—"
+                      return (
+                        <div
+                          key={`${voice.provider}:${voice.id}`}
+                          className={cn(
+                            "flex flex-col rounded-xl border transition-all text-left",
+                            isSelected
+                              ? "ring-2 ring-[#4DFFCE]/50 border-[#4DFFCE]/60 bg-white/10"
+                              : "border-white/10 bg-white/5 hover:bg-white/10"
+                          )}
+                        >
+                          <div className="flex items-start gap-3 px-4 pt-4">
+                            <span className="text-xl shrink-0" title={voice.language}>
+                              {getLangFlag(voice.language_code)}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-white truncate">
+                                  {voice.name}
+                                </p>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20 shrink-0">
+                                  {getProviderLabel(voice.provider)}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs text-white/70">
+                                {voice.language || "Unknown"}
+                                <span className="ml-1.5 text-white/50">{genderIcon}</span>
+                              </p>
+                              {voice.quality && (
+                                <span
+                                  className={cn(
+                                    "inline-block mt-1 text-[10px] px-2 py-0.5 rounded border",
+                                    qualityColor(voice.quality)
+                                  )}
+                                >
+                                  {voice.quality}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 px-4 pb-3 pt-3 border-t border-dashed border-white/10 mt-3">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => handlePreview(voice)}
+                            >
+                              {previewingId === voice.id ? "Stop" : "▶ Preview"}
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              className="flex-1 text-xs"
                               onClick={() => {
                                 stopPreview()
                                 onSelect(voice)
                                 onClose()
                               }}
-                              className={cn(
-                                "group flex flex-col items-stretch rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-left",
-                                selectedVoiceId === voice.id &&
-                                  (selectedProvider || voice.provider) === voice.provider
-                                  ? "ring-2 ring-[#4DFFCE]/50 border-[#4DFFCE]/60"
-                                  : ""
-                              )}
                             >
-                              <div className="flex items-start gap-3 px-4 pt-4">
-                                <div
-                                  className={cn(
-                                    "h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0",
-                                    (voice.gender || "").toLowerCase() === "female"
-                                      ? "bg-fuchsia-500"
-                                      : (voice.gender || "").toLowerCase() === "male"
-                                      ? "bg-sky-500"
-                                      : "bg-slate-500"
-                                  )}
-                                >
-                                  {initials(voice.name)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-sm font-semibold text-white truncate">
-                                      {voice.name}
-                                    </p>
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20 shrink-0">
-                                      {providerLabel(voice.provider)}
-                                    </span>
-                                  </div>
-                                  {voice.description && (
-                                    <p className="mt-1 text-xs text-white/70 line-clamp-2">
-                                      {voice.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3 border-t border-dashed border-white/10 mt-3">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  className="flex-1 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handlePreview(voice)
-                                  }}
-                                >
-                                  {previewingId === voice.id ? "Stop" : "▶ Preview"}
-                                </Button>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  className="flex-1 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    stopPreview()
-                                    onSelect(voice)
-                                    onClose()
-                                  }}
-                                >
-                                  Use voice
-                                </Button>
-                              </div>
-                            </button>
-                          ))}
+                              Use voice
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -341,19 +410,3 @@ export function VoiceLibrary({
     </AnimatePresence>
   )
 }
-
-function initials(name: string) {
-  const parts = name.trim().split(" ")
-  if (!parts.length) return "AI"
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[1][0]).toUpperCase()
-}
-
-function providerLabel(provider: string) {
-  const id = provider.toLowerCase()
-  if (id === "kokoro") return "Kokoro"
-  if (id === "cartesia") return "Cartesia"
-  if (id === "deepgram") return "Deepgram"
-  return provider
-}
-

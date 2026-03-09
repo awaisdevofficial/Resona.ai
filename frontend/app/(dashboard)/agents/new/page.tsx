@@ -110,14 +110,14 @@ export default function NewAgentPage() {
     enabled: voiceLibraryOpen || !!watchedVoice,
   })
 
-  // Default to Kokoro when backend is using self-hosted (Whisper + Kokoro); only set once so user can change
-  const defaultKokoroSet = useRef(false)
+  // Default to Piper when backend is using self-hosted (Whisper.cpp + Piper); only set once so user can change
+  const defaultPiperSet = useRef(false)
   useEffect(() => {
     if (
       ttsSettings?.default_provider === "whisper_kokoro" &&
-      !defaultKokoroSet.current
+      !defaultPiperSet.current
     ) {
-      defaultKokoroSet.current = true
+      defaultPiperSet.current = true
       form.setValue("tts_provider", "kokoro")
       form.setValue("tts_voice_id", "alloy")
     }
@@ -355,7 +355,7 @@ export default function NewAgentPage() {
                         Speaking voice
                       </p>
                       <p className="text-sm text-white truncate">
-                        {displayVoiceName || "Kokoro default voice"}
+                        {displayVoiceName || "Piper default voice"}
                       </p>
                       <p className="text-[11px] text-white/70">
                         Provider: {(watchedProvider || "kokoro").toUpperCase()}
@@ -385,7 +385,7 @@ export default function NewAgentPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-white/70">
-                    Browse voices (Kokoro self-hosted). Choose a voice before saving your agent.
+                    Browse voices (Piper self-hosted). Choose a voice before saving your agent.
                   </p>
                   {form.formState.errors.tts_voice_id && (
                     <p className="text-[11px] text-red-400">

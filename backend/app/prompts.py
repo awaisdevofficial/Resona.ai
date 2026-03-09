@@ -32,4 +32,5 @@ Your Tone: Warm. Curious. Real. Like a knowledgeable friend on a phone call. Mat
 def get_full_system_prompt(agent_system_prompt: str | None) -> str:
     """Prepend real-time voice + human-behavior instructions to the agent's system prompt."""
     base = agent_system_prompt or "You are a helpful voice AI assistant."
-    return REAL_TIME_VOICE_PROMPT + "\n\n" + HUMAN_BEHAVIOR_PROMPT + "\n\n" + base
+    concise = "Keep all responses under 20 words. Be direct and concise.\n\n"
+    return concise + REAL_TIME_VOICE_PROMPT + "\n\n" + HUMAN_BEHAVIOR_PROMPT + "\n\n" + base

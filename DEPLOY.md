@@ -25,7 +25,7 @@ cp backend/.env.production.example backend/.env.production
 #   FRONTEND_URL=https://resonaai.duckdns.org
 #   PUBLIC_HOST=resonaai.duckdns.org
 #   CORS_ORIGINS=https://resonaai.duckdns.org
-#   DATABASE_URL, SUPABASE_*, LIVEKIT_*, GROQ_*, KOKORO_*, WHISPER_*, INTERNAL_SECRET, SECRET_KEY
+#   DATABASE_URL, SUPABASE_*, LIVEKIT_*, GROQ_*, PIPER_*, WHISPER_*, INTERNAL_SECRET, SECRET_KEY
 ```
 
 Important for production:
@@ -55,7 +55,7 @@ These are baked into the Next.js build; rebuild the frontend after changing them
 
 Use the same env as the backend (e.g. `backend/.env` or `backend/.env.production`), plus ensure:
 
-- `API_BASE_URL`, `INTERNAL_SECRET`, `LIVEKIT_*`, `GROQ_*`, `KOKORO_*`, `WHISPER_*` (and optional `OPENAI_API_KEY` for fallback).
+- `API_BASE_URL`, `INTERNAL_SECRET`, `LIVEKIT_*`, `GROQ_*`, `PIPER_*`, `WHISPER_*` (and optional `OPENAI_API_KEY` for fallback).
 
 Run the worker with `ENV=production` so it uses production config if you use `.env.production`.
 

@@ -441,7 +441,7 @@ export default function AgentEditPage({
                           Speaking voice
                         </p>
                         <p className="text-sm text-white truncate">
-                          {displayVoiceName || "Kokoro default voice"}
+                          {displayVoiceName || "Piper default voice"}
                         </p>
                         <p className="text-[11px] text-white/70">
                           Provider: {(watchedProvider || agent.tts_provider || "kokoro").toUpperCase()}
@@ -471,7 +471,7 @@ export default function AgentEditPage({
                       </button>
                     </div>
                     <p className="text-[11px] text-white/70">
-                      Browse voices (Kokoro self-hosted).
+                      Browse voices (Piper self-hosted).
                     </p>
                     {form.formState.errors.tts_voice_id && (
                       <p className="text-[11px] text-red-400">

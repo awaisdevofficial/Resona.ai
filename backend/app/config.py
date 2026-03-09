@@ -48,13 +48,13 @@ class Settings(BaseSettings):
     # SIP origination: IP where Twilio sends inbound SIP (e.g. 18.141.140.150)
     SIP_SERVER_IP: str = "127.0.0.1"
 
-    # AI: Deepgram (STT), Cartesia (TTS), Groq (LLM); or self-hosted Kokoro (TTS) / Whisper (STT)
+    # AI: Deepgram (STT), Cartesia (TTS), Groq (LLM); or self-hosted Piper (TTS) / Whisper.cpp (STT)
     DEEPGRAM_API_KEY: str = ""
     CARTESIA_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    KOKORO_TTS_URL: str = ""
-    KOKORO_TTS_VOICE: str = "af_heart"
-    KOKORO_TTS_MODEL: str = "tts-1"
+    PIPER_TTS_URL: str = ""
+    PIPER_TTS_VOICE: str = "en_US-amy-medium"
+    PIPER_TTS_MODEL: str = "tts-1"
     WHISPER_STT_URL: str = ""
 
     # Supabase

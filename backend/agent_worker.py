@@ -7,8 +7,10 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
+from app.config import settings as app_settings
 from app.constants import (
     DEFAULT_CARTESIA_VOICE_ID,
+    DEFAULT_PIPER_VOICE,
     get_tts_provider_and_voice_id,
     _is_cartesia_voice_id,
 )
@@ -31,7 +33,7 @@ load_dotenv()
 
 
 def _base_url_from_speech_url(url: str) -> str:
-    """Normalize KOKORO_TTS_URL / WHISPER_STT_URL to OpenAI-style base (e.g. http://host:port/v1)."""
+    """Normalize PIPER_TTS_URL / WHISPER_STT_URL to OpenAI-style base (e.g. http://host:port/v1)."""
     url = (url or "").strip().rstrip("/")
     if not url:
         return ""
@@ -191,6 +193,7 @@ async def entrypoint(ctx: JobContext):
     primary_llm = groq.LLM(
         model="llama-3.3-70b-versatile",
         api_key=groq_key,
+        max_tokens=80,
     )
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if openai_key:
@@ -208,33 +211,33 @@ async def entrypoint(ctx: JobContext):
     else:
         llm = primary_llm
         logger.info("LLM: Groq only (set OPENAI_API_KEY for fallback)")
-    # TTS: self-hosted Kokoro (KOKORO_TTS_URL) first, then Cartesia
-    kokoro_tts_url = os.environ.get("KOKORO_TTS_URL", "").strip()
-    if kokoro_tts_url:
+    # TTS: self-hosted Piper (PIPER_TTS_URL) first, then Cartesia
+    piper_tts_url = os.environ.get("PIPER_TTS_URL", "").strip()
+    if piper_tts_url:
         from livekit.plugins import openai as openai_plugin
-        kokoro_base = _base_url_from_speech_url(kokoro_tts_url)
-        if not kokoro_base:
-            raise RuntimeError("KOKORO_TTS_URL must be a valid URL (e.g. http://host:8880/v1/audio/speech).")
-        # Kokoro voice: use agent's tts_voice_id if set and not a Cartesia UUID, else env default.
+        piper_base = _base_url_from_speech_url(piper_tts_url)
+        if not piper_base:
+            raise RuntimeError("PIPER_TTS_URL must be a valid URL (e.g. http://host:8880/v1/audio/speech).")
+        # Piper voice: use agent's tts_voice_id if set and not a Cartesia UUID, else config default.
         raw_voice = (agent_config.get("tts_voice_id") or "").strip()
         if _is_cartesia_voice_id(raw_voice) or not raw_voice:
-            kokoro_voice = (os.environ.get("KOKORO_TTS_VOICE", "af_heart") or "af_heart").strip()
+            piper_voice = (app_settings.PIPER_TTS_VOICE or DEFAULT_PIPER_VOICE or "en_US-amy-medium").strip()
         else:
-            kokoro_voice = raw_voice
-        kokoro_model = os.environ.get("KOKORO_TTS_MODEL", "tts-1")
+            piper_voice = raw_voice
+        piper_model = app_settings.PIPER_TTS_MODEL or "tts-1"
         tts = openai_plugin.TTS(
-            model=kokoro_model,
-            voice=kokoro_voice,
-            base_url=kokoro_base,
+            model=piper_model,
+            voice=piper_voice,
+            base_url=piper_base,
             api_key=os.environ.get("OPENAI_API_KEY", "sk-self-hosted"),
             response_format="mp3",
         )
-        logger.info("TTS: self-hosted Kokoro at %s (model=%s voice=%s)", kokoro_base, kokoro_model, kokoro_voice)
+        logger.info("TTS: self-hosted Piper at %s (model=%s voice=%s)", piper_base, piper_model, piper_voice)
     else:
         cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
         if not cartesia_key:
             raise RuntimeError(
-                "CARTESIA_API_KEY or KOKORO_TTS_URL is required for TTS. Set one in the environment."
+                "CARTESIA_API_KEY or PIPER_TTS_URL is required for TTS. Set one in the environment."
             )
         tts = cartesia.TTS(
             model="sonic-3",

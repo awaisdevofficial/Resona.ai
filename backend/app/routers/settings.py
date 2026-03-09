@@ -129,11 +129,11 @@ async def get_tts_settings(
     """
     deepgram_configured = bool(settings.DEEPGRAM_API_KEY)
     whisper_configured = bool(_base_url_from_speech_url(settings.WHISPER_STT_URL))
-    kokoro_configured = bool(_base_url_from_speech_url(settings.KOKORO_TTS_URL))
+    piper_configured = bool(_base_url_from_speech_url(settings.PIPER_TTS_URL))
     cartesia_configured = bool(settings.CARTESIA_API_KEY)
 
     # Default: self-hosted if set, else Deepgram/Cartesia
-    if whisper_configured and kokoro_configured:
+    if whisper_configured and piper_configured:
         default_provider = "whisper_kokoro"
     elif deepgram_configured:
         default_provider = "deepgram"
@@ -147,17 +147,17 @@ async def get_tts_settings(
                 id="deepgram",
                 label="Deepgram Aura",
                 configured=True,
-                recommended=not (whisper_configured or kokoro_configured),
+                recommended=not (whisper_configured or piper_configured),
                 cost_display="STT + TTS (usage-based)",
             )
         )
-    if whisper_configured or kokoro_configured:
+    if whisper_configured or piper_configured:
         providers.append(
             TTSProviderStatus(
                 id="whisper_kokoro",
-                label="Self-hosted (Whisper STT + Kokoro TTS)",
+                label="Self-hosted (Whisper.cpp STT + Piper TTS)",
                 configured=True,
-                recommended=whisper_configured and kokoro_configured,
+                recommended=whisper_configured and piper_configured,
                 cost_display="Free (self-hosted)",
             )
         )
@@ -165,10 +165,10 @@ async def get_tts_settings(
         providers.append(
             TTSProviderStatus(
                 id="whisper_kokoro",
-                label="Self-hosted (Whisper STT + Kokoro TTS)",
+                label="Self-hosted (Whisper.cpp STT + Piper TTS)",
                 configured=False,
                 recommended=True,
-                cost_display="Set KOKORO_TTS_URL and WHISPER_STT_URL in .env",
+                cost_display="Set PIPER_TTS_URL and WHISPER_STT_URL in .env",
             )
         )
 
