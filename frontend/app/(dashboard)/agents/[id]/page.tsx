@@ -136,9 +136,10 @@ export default function AgentEditPage({
     enabled: voiceLibraryOpen || !!voiceId,
   })
   const displayVoiceName = useMemo(() => {
-    if (!voiceId) return "Default"
-    const v = (voices as Voice[]).find((x) => x.id === voiceId)
-    return v?.name ?? (voiceId.length > 12 ? `${voiceId.slice(0, 8)}…` : voiceId)
+    const vid = (voiceId || "").trim()
+    if (!vid) return "Default"
+    const v = (voices as Voice[]).find((x) => (x.id || "").trim() === vid)
+    return v?.name ?? (vid.length > 12 ? `${vid.slice(0, 8)}…` : vid)
   }, [voices, voiceId])
 
   const { mutate: save, isPending: saving } = useMutation({

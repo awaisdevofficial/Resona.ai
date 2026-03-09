@@ -208,8 +208,12 @@ export function VoiceLibrary({
   }, [voices, tab, languageFilter, search])
 
   const selectedLabel = useMemo(() => {
-    if (!selectedVoiceId) return null
-    const match = voices.find((v) => v.id === selectedVoiceId && v.provider === (selectedProvider || v.provider))
+    const sid = (selectedVoiceId || "").trim()
+    if (!sid) return null
+    const sp = (selectedProvider || "piper").toLowerCase()
+    const match = voices.find(
+      (v) => (v.id || "").trim() === sid && (v.provider || "piper").toLowerCase() === sp
+    )
     return match ? `${match.name} · ${getProviderLabel(match.provider)}` : null
   }, [voices, selectedVoiceId, selectedProvider])
 
@@ -355,9 +359,11 @@ export function VoiceLibrary({
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredVoices.map((voice) => {
+                      const sid = (selectedVoiceId || "").trim()
+                      const sp = (selectedProvider || voice.provider || "piper").toLowerCase()
+                      const vp = (voice.provider || "piper").toLowerCase()
                       const isSelected =
-                        selectedVoiceId === voice.id &&
-                        (selectedProvider || voice.provider) === voice.provider
+                        sid === (voice.id || "").trim() && sp === vp
                       const genderIcon =
                         (voice.gender || "").toLowerCase() === "female"
                           ? "♀"

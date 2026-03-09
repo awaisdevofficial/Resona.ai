@@ -184,9 +184,10 @@ export default function NewAgentPage() {
     watchedSystemPrompt ||
     "You are a helpful, friendly voice AI agent that assists callers with their questions."
   const displayVoiceName = useMemo(() => {
-    if (!watchedVoice) return "Default"
-    const v = (voices as Voice[]).find((x) => x.id === watchedVoice)
-    return v?.name ?? (watchedVoice.length > 12 ? `${watchedVoice.slice(0, 8)}…` : watchedVoice)
+    const vid = (watchedVoice || "").trim()
+    if (!vid) return "Default"
+    const v = (voices as Voice[]).find((x) => (x.id || "").trim() === vid)
+    return v?.name ?? (vid.length > 12 ? `${vid.slice(0, 8)}…` : vid)
   }, [voices, watchedVoice])
   const displaySilenceTimeout = watchedSilenceTimeout ?? 30
   const displayMaxDuration = watchedMaxDuration ?? 3600
