@@ -152,7 +152,6 @@ async def entrypoint(ctx: JobContext):
     primary_llm = groq.LLM(
         model="llama-3.3-70b-versatile",
         api_key=groq_key,
-        max_tokens=80,
     )
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if openai_key:

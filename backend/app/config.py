@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     PIPER_TTS_URL: str = ""
     PIPER_TTS_VOICE: str = "en_US-amy-medium"
     PIPER_TTS_MODEL: str = "tts-1"
+    # Whisper.cpp OpenAI-compatible proxy (e.g. http://18.141.177.170:8002/v1/audio/transcriptions)
     WHISPER_STT_URL: str = ""
     WHISPER_STT_MODEL: str = "whisper-1"
     WHISPER_STT_LANGUAGE: str = "en"

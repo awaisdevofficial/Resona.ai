@@ -26,10 +26,38 @@ def _piper_base_url() -> str:
 
 
 PIPER_VOICES_FALLBACK = [
-    {"id": "en_US-amy-medium", "name": "Amy", "provider": "piper", "gender": "female", "language": "English"},
-    {"id": "en_US-joe-medium", "name": "Joe", "provider": "piper", "gender": "male", "language": "English"},
-    {"id": "en_US-ryan-medium", "name": "Ryan", "provider": "piper", "gender": "male", "language": "English"},
+    {"id": "en_US-amy-medium", "name": "Amy", "provider": "piper", "language": "English (US)", "language_code": "en_US", "gender": "female", "quality": "medium", "description": "English (US) — Female"},
+    {"id": "en_US-joe-medium", "name": "Joe", "provider": "piper", "language": "English (US)", "language_code": "en_US", "gender": "male", "quality": "medium", "description": "English (US) — Male"},
+    {"id": "en_US-ryan-medium", "name": "Ryan", "provider": "piper", "language": "English (US)", "language_code": "en_US", "gender": "male", "quality": "medium", "description": "English (US) — Male"},
+    {"id": "en_GB-alan-medium", "name": "Alan", "provider": "piper", "language": "English (GB)", "language_code": "en_GB", "gender": "male", "quality": "medium", "description": "English (GB) — Male"},
 ]
+
+
+def _enrich_voice(v: dict) -> dict:
+    """Ensure voice has language, language_code, gender, quality, description, provider."""
+    vid = v.get("id", "")
+    if not v.get("language"):
+        parts = vid.split("-")
+        lang_code = parts[0] if parts else "en_US"
+        lang_map = {
+            "en_US": "English (US)",
+            "en_GB": "English (GB)",
+            "es_ES": "Spanish",
+            "fr_FR": "French",
+            "de_DE": "German",
+            "it_IT": "Italian",
+            "pt_BR": "Portuguese",
+            "ar_JO": "Arabic",
+            "zh_CN": "Chinese",
+            "ja_JP": "Japanese",
+        }
+        v["language"] = lang_map.get(lang_code, lang_code)
+        v["language_code"] = lang_code
+    v.setdefault("provider", "piper")
+    v.setdefault("gender", "neutral")
+    v.setdefault("quality", "medium")
+    v.setdefault("description", f"{v['language']} — {v.get('gender', '').title()}")
+    return v
 
 
 class Voice(BaseModel):
@@ -63,13 +91,18 @@ async def _fetch_piper_voices() -> list[Voice]:
                     data = resp.json()
                     voices = []
                     for v in data if isinstance(data, list) else []:
+                        raw = dict(v) if isinstance(v, dict) else {"id": str(v), "name": str(v)}
+                        enriched = _enrich_voice(raw)
                         voices.append(
                             Voice(
-                                id=v.get("id", ""),
-                                name=v.get("name", ""),
-                                provider="piper",
-                                gender=v.get("gender", "neutral"),
-                                description=v.get("description", ""),
+                                id=enriched.get("id", ""),
+                                name=enriched.get("name", ""),
+                                provider=enriched.get("provider", "piper"),
+                                gender=enriched.get("gender"),
+                                description=enriched.get("description"),
+                                language=enriched.get("language"),
+                                language_code=enriched.get("language_code"),
+                                quality=enriched.get("quality"),
                             )
                         )
                     if voices:
@@ -77,14 +110,7 @@ async def _fetch_piper_voices() -> list[Voice]:
         except Exception:
             pass
     return [
-        Voice(
-            id=v["id"],
-            name=v["name"],
-            provider=v.get("provider", "piper"),
-            gender=v.get("gender"),
-            description=v.get("description") or f"Piper TTS — {v.get('language', '')}",
-            language=v.get("language"),
-        )
+        Voice(**_enrich_voice(dict(v)))
         for v in PIPER_VOICES_FALLBACK
     ]
 

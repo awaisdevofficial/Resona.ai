@@ -133,7 +133,7 @@ export function VoiceLibrary({
         },
         body: JSON.stringify({
           voice_id: voice.id,
-          provider: voice.provider || "piper",
+          provider: "piper",
           text: "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
       })
