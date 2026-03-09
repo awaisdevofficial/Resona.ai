@@ -161,7 +161,11 @@ export function VoiceLibrary({
           text: "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
       })
-      if (!res.ok) throw new Error("Preview failed")
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        const msg = (err as { detail?: string })?.detail || (res.status === 404 ? "This voice is not installed on the TTS server." : "Preview failed")
+        throw new Error(msg)
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const el = new Audio(url)
@@ -260,6 +264,9 @@ export function VoiceLibrary({
                   </h2>
                   <p className="text-xs text-white/70 mt-0.5">
                     {voices.length} voices available · Select any voice for your agent
+                  </p>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    Preview plays the selected voice only when it&apos;s installed on your TTS server.
                   </p>
                 </div>
                 <button

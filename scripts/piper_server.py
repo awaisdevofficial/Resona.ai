@@ -104,10 +104,13 @@ def get_available_voices():
     return voices
 
 
-def find_onnx(voice_id: str, voices: list) -> str | None:
+def find_onnx(voice_id: str, voices: list, strict: bool = False) -> str | None:
+    """Resolve voice_id to .onnx path. If strict=True, only exact match; else fallback to first English or first voice."""
     voice_map = {v["id"]: v["onnx_path"] for v in voices}
     if voice_id in voice_map:
         return voice_map[voice_id]
+    if strict:
+        return None
     for vid, vpath in voice_map.items():
         if voice_id in vid or vid in voice_id:
             return vpath
@@ -121,6 +124,7 @@ class TTSRequest(BaseModel):
     input: str
     model: str = "tts-1"
     voice: str = "en_US-amy-medium"
+    strict: bool = False  # If True, only use exact voice match (for preview); no fallback
 
 
 @app.post("/v1/audio/speech")
@@ -128,9 +132,12 @@ async def synthesize(req: TTSRequest):
     voices = get_available_voices()
     if not voices:
         raise HTTPException(status_code=503, detail="No voices available")
-    onnx_path = find_onnx(req.voice, voices)
+    onnx_path = find_onnx(req.voice, voices, strict=req.strict)
     if not onnx_path:
-        raise HTTPException(status_code=404, detail=f"Voice '{req.voice}' not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Voice '{req.voice}' not installed on this server. Install the .onnx model or use a listed voice.",
+        )
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         out_path = f.name
     try:

@@ -196,10 +196,11 @@ async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_curr
     url = f"{base}/audio/speech"
     try:
         async with httpx.AsyncClient(timeout=30) as client:
+            # strict=True so preview uses the exact voice; no fallback to another voice
             resp = await client.post(
                 url,
                 headers={"Content-Type": "application/json"},
-                json={"model": model, "voice": voice, "input": text},
+                json={"model": model, "voice": voice, "input": text, "strict": True},
             )
     except httpx.ConnectError as e:
         logger.warning("Piper TTS connection failed: %s", e)
@@ -212,6 +213,11 @@ async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_curr
         raise HTTPException(status_code=502, detail=f"Piper TTS error: {e!s}") from e
     if resp.status_code != 200:
         logger.warning("Piper TTS returned %s: %s", resp.status_code, resp.text[:300])
+        if resp.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Voice '{voice}' is not installed on the TTS server. Preview only works for voices that are installed.",
+            )
         raise HTTPException(
             status_code=502,
             detail=f"Piper TTS preview failed (HTTP {resp.status_code}): {resp.text[:200] if resp.text else 'no body'}",
