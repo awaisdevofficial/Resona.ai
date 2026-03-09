@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from app.config import settings
-from app.constants import get_tts_provider_and_voice_id
+from app.constants import LIVEKIT_TTS_PROVIDER, get_tts_provider_and_voice_id
 import httpx as _httpx
 
 from app.database import get_db
@@ -208,7 +208,7 @@ async def _create_web_call_token_impl(
         "llm_max_tokens": agent.llm_max_tokens or 500,
         "stt_language": agent.stt_language or "en-US",
         "stt_model": agent.stt_model or "nova-2-general",
-        "tts_provider": tts_provider,
+        "tts_provider": LIVEKIT_TTS_PROVIDER,
         "tts_voice_id": voice_id,
         "tts_stability": agent.tts_stability or 0.5,
         "silence_timeout": int(agent.silence_timeout or 30),
@@ -251,7 +251,12 @@ async def _create_web_call_token_impl(
         .to_jwt()
     )
 
-    api_url = (settings.LIVEKIT_API_URL or "").strip() or "http://127.0.0.1:7880"
+    api_url = (settings.LIVEKIT_API_URL or "").strip()
+    if not api_url:
+        raise HTTPException(
+            status_code=503,
+            detail="LIVEKIT_API_URL is not configured.",
+        )
     try:
         async with LiveKitAPI(
             url=api_url,

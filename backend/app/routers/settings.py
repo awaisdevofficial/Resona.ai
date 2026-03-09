@@ -109,28 +109,68 @@ async def disconnect_twilio(
     return {"status": "disconnected"}
 
 
+def _base_url_from_speech_url(url: str) -> str:
+    """Normalize full TTS/STT URL to OpenAI-style base (e.g. http://host:port/v1)."""
+    url = (url or "").strip().rstrip("/")
+    if not url or "/v1" not in url:
+        return ""
+    return url[: url.find("/v1") + 4]
+
+
 @router.get("/tts", response_model=TTSSettingsResponse)
 async def get_tts_settings(
     user: User = Depends(get_current_user),  # noqa: ARG001
 ):
     """
-    Return available TTS providers for display in the Settings UI.
+    Return available TTS/STT providers for display in the Settings UI.
 
     This is deployment-wide configuration (from environment variables),
     not per-user API keys.
     """
     deepgram_configured = bool(settings.DEEPGRAM_API_KEY)
-    default_provider = "deepgram" if deepgram_configured else "deepgram"
+    whisper_configured = bool(_base_url_from_speech_url(settings.WHISPER_STT_URL))
+    kokoro_configured = bool(_base_url_from_speech_url(settings.KOKORO_TTS_URL))
+    cartesia_configured = bool(settings.CARTESIA_API_KEY)
 
-    providers = [
-        TTSProviderStatus(
-            id="deepgram",
-            label="Deepgram Aura",
-            configured=deepgram_configured,
-            recommended=True,
-            cost_display="STT + TTS (usage-based)",
-        ),
-    ]
+    # Default: self-hosted if set, else Deepgram/Cartesia
+    if whisper_configured and kokoro_configured:
+        default_provider = "whisper_kokoro"
+    elif deepgram_configured:
+        default_provider = "deepgram"
+    else:
+        default_provider = "whisper_kokoro" if whisper_configured else "deepgram"
+
+    providers = []
+    if deepgram_configured:
+        providers.append(
+            TTSProviderStatus(
+                id="deepgram",
+                label="Deepgram Aura",
+                configured=True,
+                recommended=not (whisper_configured or kokoro_configured),
+                cost_display="STT + TTS (usage-based)",
+            )
+        )
+    if whisper_configured or kokoro_configured:
+        providers.append(
+            TTSProviderStatus(
+                id="whisper_kokoro",
+                label="Self-hosted (Whisper STT + Kokoro TTS)",
+                configured=True,
+                recommended=whisper_configured and kokoro_configured,
+                cost_display="Free (self-hosted)",
+            )
+        )
+    if not providers:
+        providers.append(
+            TTSProviderStatus(
+                id="whisper_kokoro",
+                label="Self-hosted (Whisper STT + Kokoro TTS)",
+                configured=False,
+                recommended=True,
+                cost_display="Set KOKORO_TTS_URL and WHISPER_STT_URL in .env",
+            )
+        )
 
     return TTSSettingsResponse(default_provider=default_provider, providers=providers)
 
@@ -229,8 +269,12 @@ async def configure_sip(
 
     await db.commit()
 
-    livekit_sip_uri = f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}"
-    origination_uri = f"{livekit_sip_uri}:5060"
+    if settings.LIVEKIT_SIP_URI:
+        origination_uri = settings.LIVEKIT_SIP_URI
+        livekit_sip_uri = origination_uri.rsplit(":", 1)[0] if ":5060" in origination_uri else origination_uri
+    else:
+        livekit_sip_uri = f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}"
+        origination_uri = f"{livekit_sip_uri}:5060"
 
     return SIPStatusResponse(
         configured=True,
@@ -255,8 +299,12 @@ async def get_sip_status(
     if not user_settings or not user_settings.sip_configured:
         return SIPStatusResponse(configured=False)
 
-    livekit_sip_uri = f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}"
-    origination_uri = f"{livekit_sip_uri}:5060"
+    if settings.LIVEKIT_SIP_URI:
+        origination_uri = settings.LIVEKIT_SIP_URI
+        livekit_sip_uri = origination_uri.rsplit(":", 1)[0] if ":5060" in origination_uri else origination_uri
+    else:
+        livekit_sip_uri = f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}"
+        origination_uri = f"{livekit_sip_uri}:5060"
 
     return SIPStatusResponse(
         configured=True,

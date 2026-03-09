@@ -1,0 +1,50 @@
+# Production: Backend + Frontend. Uses Supabase (no local postgres).
+# Set env in .env.production or pass via shell. Agent worker: run separately (e.g. systemd).
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.production
+    environment:
+      - ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    extra_hosts:
+      # So backend in Docker can reach LiveKit on host (use LIVEKIT_API_URL=http://host.docker.internal:7880)
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://resonaai.duckdns.org}
+        - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL:-wss://resonaai.duckdns.org/livekit}
+        - NEXT_PUBLIC_ORIGINATION_URI=${NEXT_PUBLIC_ORIGINATION_URI}
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:

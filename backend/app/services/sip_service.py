@@ -12,8 +12,6 @@ from livekit.protocol.sip import (
     SIPOutboundTrunkInfo,
 )
 
-import os
-
 from app.config import settings
 
 
@@ -33,7 +31,7 @@ async def setup_user_sip(
     Returns a dict containing trunk IDs and dispatch rule ID.
     """
     lk = api.LiveKitAPI(
-        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
+        url=settings.LIVEKIT_API_URL,
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     )
@@ -118,7 +116,7 @@ async def delete_user_sip(
 ) -> None:
     """Remove all SIP resources for a user from LiveKit."""
     lk = api.LiveKitAPI(
-        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
+        url=settings.LIVEKIT_API_URL,
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     )
@@ -153,7 +151,7 @@ async def make_outbound_sip_call(
     from livekit.protocol.sip import CreateSIPParticipantRequest
 
     lk = api.LiveKitAPI(
-        url=os.environ.get("LIVEKIT_API_URL", "http://54.151.186.116:7880"),
+        url=settings.LIVEKIT_API_URL,
         api_key=settings.LIVEKIT_API_KEY,
         api_secret=settings.LIVEKIT_API_SECRET,
     )

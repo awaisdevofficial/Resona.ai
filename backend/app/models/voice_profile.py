@@ -19,7 +19,7 @@ class VoiceProfile(Base):
     )
 
     # Underlying provider and its voice/profile identifier
-    provider = Column(String, nullable=False)  # e.g. "deepgram", "chatterbox"
+    provider = Column(String, nullable=False)  # e.g. "deepgram", "kokoro", "cartesia"
     provider_voice_id = Column(String, nullable=False)
 
     # Display information for the voice library
@@ -27,7 +27,7 @@ class VoiceProfile(Base):
     description = Column(String, nullable=True)
     gender = Column(String, nullable=True)
 
-    # Arbitrary provider-specific metadata (e.g. chatterbox profile path)
+    # Arbitrary provider-specific metadata
     metadata_json = Column(JSONB, default=dict)
 
     created_at = Column(DateTime, default=datetime.utcnow)

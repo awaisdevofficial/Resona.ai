@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
+from urllib.parse import urlparse
 
 
 def _strip_trailing_slash(v: str) -> str:
@@ -7,8 +8,29 @@ def _strip_trailing_slash(v: str) -> str:
     return v.rstrip("/") if isinstance(v, str) and v else v
 
 
+def _livekit_api_url_from_ws_url(ws_url: str) -> str:
+    """Derive HTTP API URL from LIVEKIT_URL (wss://host/path -> https://host)."""
+    if not (ws_url or "").strip():
+        return ""
+    parsed = urlparse(ws_url)
+    scheme = "https" if parsed.scheme == "wss" else "http"
+    return f"{scheme}://{parsed.netloc}"
+
+
+def _env_files() -> list[str]:
+    """Load .env.production first when ENV=production, else .env. Missing files are skipped (env vars still apply)."""
+    import os
+    if os.environ.get("ENV") == "production":
+        return [".env.production", ".env"]
+    return [".env"]
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_env_files(),
+        extra="ignore",
+        env_file_encoding="utf-8",
+    )
 
     # Database
     DATABASE_URL: str
@@ -19,17 +41,21 @@ class Settings(BaseSettings):
 
     # LiveKit
     LIVEKIT_URL: str
-    LIVEKIT_API_URL: str = ""  # HTTP URL for LiveKit API (SIP/twirp); e.g. http://127.0.0.1:7880
+    LIVEKIT_API_URL: str = ""  # HTTP URL for LiveKit API (SIP/twirp). If empty or localhost, derived from LIVEKIT_URL.
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
     LIVEKIT_SIP_URI: str = ""
     # SIP origination: IP where Twilio sends inbound SIP (e.g. 18.141.140.150)
     SIP_SERVER_IP: str = "127.0.0.1"
 
-    # AI: Deepgram (STT + optional TTS), Cartesia (TTS), Groq (LLM)
+    # AI: Deepgram (STT), Cartesia (TTS), Groq (LLM); or self-hosted Kokoro (TTS) / Whisper (STT)
     DEEPGRAM_API_KEY: str = ""
     CARTESIA_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    KOKORO_TTS_URL: str = ""
+    KOKORO_TTS_VOICE: str = "af_heart"
+    KOKORO_TTS_MODEL: str = "tts-1"
+    WHISPER_STT_URL: str = ""
 
     # Supabase
     SUPABASE_URL: str
@@ -65,6 +91,16 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_url(cls, v: str) -> str:
         return _strip_trailing_slash(v)
+
+    @model_validator(mode="after")
+    def set_livekit_api_url_from_ws(self):
+        """When LIVEKIT_API_URL is empty or points to localhost, derive from LIVEKIT_URL so worker/backend use the same server."""
+        api_url = (self.LIVEKIT_API_URL or "").strip()
+        if not api_url or "localhost" in api_url or "127.0.0.1" in api_url:
+            derived = _livekit_api_url_from_ws_url(self.LIVEKIT_URL or "")
+            if derived:
+                object.__setattr__(self, "LIVEKIT_API_URL", derived)
+        return self
 
 
 settings = Settings()

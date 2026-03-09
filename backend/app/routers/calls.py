@@ -12,7 +12,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.constants import get_tts_provider_and_voice_id
+from app.constants import LIVEKIT_TTS_PROVIDER, get_tts_provider_and_voice_id
 from app.database import AsyncSessionLocal, get_db
 from app.prompts import get_full_system_prompt
 from app.middleware.auth import get_current_user, verify_internal_secret
@@ -187,7 +187,7 @@ async def make_outbound_call(
             "first_message": agent.first_message
             or "Hi, how can I help you today?",
             "tts_voice_id": voice_id,
-            "tts_provider": tts_provider,
+            "tts_provider": LIVEKIT_TTS_PROVIDER,
             "stt_model": agent.stt_model or "nova-2-general",
             "stt_language": agent.stt_language or "en-US",
             "silence_timeout": int(agent.silence_timeout or 30),

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button"
 import { api, API_BASE_URL, getAuthToken } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
 
-export type VoiceProvider = "deepgram" | "cartesia" | "chatterbox"
+export type VoiceProvider = "kokoro" | "cartesia" | "deepgram"
 
 export interface Voice {
   id: string
@@ -17,10 +17,9 @@ export interface Voice {
   gender?: string | null
   description?: string | null
   preview_url?: string | null
-  is_custom?: boolean
 }
 
-type TabFilter = "all" | "female" | "male" | "custom"
+type TabFilter = "all" | "female" | "male"
 
 interface VoiceLibraryProps {
   open: boolean
@@ -91,7 +90,7 @@ export function VoiceLibrary({
         },
         body: JSON.stringify({
           voice_id: voice.id,
-          provider: "cartesia",
+          provider: voice.provider || "kokoro",
           text: "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
       })
@@ -114,7 +113,6 @@ export function VoiceLibrary({
     return voices.filter((v) => {
       if (tab === "female" && v.gender?.toLowerCase() !== "female") return false
       if (tab === "male" && v.gender?.toLowerCase() !== "male") return false
-      if (tab === "custom" && !v.is_custom) return false
       if (!search.trim()) return true
       const q = search.toLowerCase()
       return (
@@ -124,6 +122,17 @@ export function VoiceLibrary({
       )
     })
   }, [voices, tab, search])
+
+  const voicesByProvider = useMemo(() => {
+    const map = new Map<string, Voice[]>()
+    for (const v of filteredVoices) {
+      const key = (v.provider || "other").toLowerCase()
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(v)
+    }
+    const order = ["kokoro", "cartesia", "deepgram", "other"]
+    return order.filter((p) => map.has(p)).map((p) => ({ provider: p, voices: map.get(p)! }))
+  }, [filteredVoices])
 
   const selectedLabel = useMemo(() => {
     if (!selectedVoiceId) return null
@@ -156,10 +165,10 @@ export function VoiceLibrary({
                 <div>
                   <h2 className="text-base font-semibold text-white flex items-center gap-2">
                     <Headphones size={18} />
-                    Voice Library
+                    Voice library
                   </h2>
                   <p className="text-xs text-white/70 mt-0.5">
-                    Browse real human voices and choose how your agent should sound. Voices are loaded from your provider (e.g. Cartesia); more can be added via your provider or API.
+                    Browse voices and choose how your agent should sound. Kokoro is the primary TTS; Cartesia is available as fallback when configured.
                   </p>
                 </div>
                 <button
@@ -200,7 +209,6 @@ export function VoiceLibrary({
                       { id: "all", label: "All" },
                       { id: "female", label: "Female" },
                       { id: "male", label: "Male" },
-                      { id: "custom", label: "Custom" },
                     ].map((t) => (
                       <button
                         key={t.id}
@@ -221,8 +229,6 @@ export function VoiceLibrary({
               </div>
 
               <div className="p-6 overflow-y-auto space-y-4">
-                {tab === "custom" && <CloneVoiceSection />}
-
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <div className="text-sm text-white/70">Loading voices…</div>
@@ -241,85 +247,89 @@ export function VoiceLibrary({
                     No voices match your filter or search. Try &quot;All&quot; or clear the search.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredVoices.map((voice) => (
-                      <button
-                        key={`${voice.provider}:${voice.id}`}
-                        type="button"
-                        onClick={() => {
-                          stopPreview()
-                          onSelect(voice)
-                          onClose()
-                        }}
-                        className={cn(
-                          "group flex flex-col items-stretch rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-left",
-                          selectedVoiceId === voice.id &&
-                            (selectedProvider || voice.provider) === voice.provider
-                            ? "ring-2 ring-[#4DFFCE]/50 border-[#4DFFCE]/60"
-                            : ""
-                        )}
-                      >
-                        <div className="flex items-start gap-3 px-4 pt-4">
-                          <div
-                            className={cn(
-                              "h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0",
-                              (voice.gender || "").toLowerCase() === "female"
-                                ? "bg-fuchsia-500"
-                                : (voice.gender || "").toLowerCase() === "male"
-                                ? "bg-sky-500"
-                                : "bg-slate-500"
-                            )}
-                          >
-                            {initials(voice.name)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-white truncate">
-                                {voice.name}
-                              </p>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20 shrink-0">
-                                {providerLabel(voice.provider)}
-                              </span>
-                            </div>
-                            {voice.description && (
-                              <p className="mt-1 text-xs text-white/70 line-clamp-2">
-                                {voice.description}
-                              </p>
-                            )}
-                            {voice.is_custom && (
-                              <p className="mt-1 text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                Custom clone
-                              </p>
-                            )}
-                          </div>
+                  <div className="space-y-6">
+                    {voicesByProvider.map(({ provider, voices: providerVoices }) => (
+                      <div key={provider}>
+                        <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-3">
+                          {providerLabel(provider)}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {providerVoices.map((voice) => (
+                            <button
+                              key={`${voice.provider}:${voice.id}`}
+                              type="button"
+                              onClick={() => {
+                                stopPreview()
+                                onSelect(voice)
+                                onClose()
+                              }}
+                              className={cn(
+                                "group flex flex-col items-stretch rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-left",
+                                selectedVoiceId === voice.id &&
+                                  (selectedProvider || voice.provider) === voice.provider
+                                  ? "ring-2 ring-[#4DFFCE]/50 border-[#4DFFCE]/60"
+                                  : ""
+                              )}
+                            >
+                              <div className="flex items-start gap-3 px-4 pt-4">
+                                <div
+                                  className={cn(
+                                    "h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0",
+                                    (voice.gender || "").toLowerCase() === "female"
+                                      ? "bg-fuchsia-500"
+                                      : (voice.gender || "").toLowerCase() === "male"
+                                      ? "bg-sky-500"
+                                      : "bg-slate-500"
+                                  )}
+                                >
+                                  {initials(voice.name)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-white truncate">
+                                      {voice.name}
+                                    </p>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20 shrink-0">
+                                      {providerLabel(voice.provider)}
+                                    </span>
+                                  </div>
+                                  {voice.description && (
+                                    <p className="mt-1 text-xs text-white/70 line-clamp-2">
+                                      {voice.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3 border-t border-dashed border-white/10 mt-3">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handlePreview(voice)
+                                  }}
+                                >
+                                  {previewingId === voice.id ? "Stop" : "▶ Preview"}
+                                </Button>
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  className="flex-1 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    stopPreview()
+                                    onSelect(voice)
+                                    onClose()
+                                  }}
+                                >
+                                  Use voice
+                                </Button>
+                              </div>
+                            </button>
+                          ))}
                         </div>
-                        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3 border-t border-dashed border-white/10 mt-3">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex-1 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handlePreview(voice)
-                            }}
-                          >
-                            {previewingId === voice.id ? "Stop" : "Preview"}
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            className="flex-1 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              stopPreview()
-                              onSelect(voice)
-                              onClose()
-                            }}
-                          >
-                            Use voice
-                          </Button>
-                        </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -332,81 +342,6 @@ export function VoiceLibrary({
   )
 }
 
-function CloneVoiceSection() {
-  const [file, setFile] = useState<File | null>(null)
-  const [name, setName] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  const handleClone = async () => {
-    if (!file || !name.trim()) return
-    setLoading(true)
-    try {
-      const token = await getAuthToken()
-      const formData = new FormData()
-      formData.append("name", name.trim())
-      formData.append("file", file)
-
-      const res = await fetch(`${API_BASE_URL}/v1/voices/clone/chatterbox`, {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-      })
-      if (!res.ok) throw new Error("Clone failed")
-      // voices query will be refetched by the parent on next open; keep simple here
-      setName("")
-      setFile(null)
-    } catch {
-      // no-op; parent can show toast if desired
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-white/5 px-4 py-4 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold text-white">Clone a Voice</p>
-          <p className="text-[11px] text-white/70">
-            Upload at least 30 seconds of clean speech to create a custom voice.
-          </p>
-        </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/20">
-          Chatterbox (offline)
-        </span>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Voice name (e.g. Support Voice)"
-          className="form-input flex-1 text-xs py-2"
-        />
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="text-[11px]"
-        />
-      </div>
-      <div className="flex justify-end">
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!file || !name.trim() || loading}
-          onClick={handleClone}
-          className="text-xs"
-        >
-          {loading ? "Cloning…" : "Create Clone"}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 function initials(name: string) {
   const parts = name.trim().split(" ")
   if (!parts.length) return "AI"
@@ -416,9 +351,9 @@ function initials(name: string) {
 
 function providerLabel(provider: string) {
   const id = provider.toLowerCase()
-  if (id === "cartesia") return "Cartesia Sonic"
-  if (id === "deepgram") return "Deepgram Aura"
-  if (id === "chatterbox") return "Chatterbox (offline)"
+  if (id === "kokoro") return "Kokoro"
+  if (id === "cartesia") return "Cartesia"
+  if (id === "deepgram") return "Deepgram"
   return provider
 }
 

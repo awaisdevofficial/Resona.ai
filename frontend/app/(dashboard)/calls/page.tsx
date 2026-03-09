@@ -566,7 +566,7 @@ function CallDetailDrawer({
       requestAnimationFrame(() => setIsEntering(false));
     });
     return () => cancelAnimationFrame(t);
-  }, [call?.id]);
+  }, [call]);
 
   if (!call || typeof document === "undefined") return null;
 
