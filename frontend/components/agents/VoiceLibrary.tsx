@@ -18,7 +18,7 @@ export interface Voice {
   language_code?: string
   country?: string
   gender?: "male" | "female" | "neutral" | string
-  quality?: "low" | "medium" | "high"
+  quality?: "low" | "medium" | "high" | "x_low"
   description?: string
 }
 

@@ -75,30 +75,36 @@ PIPER_VOICES_FALLBACK = [
 ]
 
 
+# Language display names for Piper voices (catalog may omit name_english for some).
+_LANG_DISPLAY: dict[str, str] = {
+    "en_US": "English (US)", "en_GB": "English (GB)",
+    "es_ES": "Spanish", "es_MX": "Spanish (MX)",
+    "fr_FR": "French",
+    "de_DE": "German",
+    "it_IT": "Italian",
+    "pt_BR": "Portuguese (BR)", "pt_PT": "Portuguese (PT)",
+    "ar_JO": "Arabic", "zh_CN": "Chinese", "ja_JP": "Japanese", "ko_KR": "Korean",
+    "hi_IN": "Hindi", "ru_RU": "Russian", "nl_NL": "Dutch", "nl_BE": "Dutch (BE)",
+    "pl_PL": "Polish", "tr_TR": "Turkish",
+}
+
+
 def _enrich_voice(v: dict) -> dict:
     """Ensure voice has language, language_code, gender, quality, description, provider."""
     vid = v.get("id", "")
-    if not v.get("language"):
+    lang_code = (v.get("language_code") or "").strip()
+    if not lang_code and vid:
         parts = vid.split("-")
         lang_code = parts[0] if parts else "en_US"
-        lang_map = {
-            "en_US": "English (US)",
-            "en_GB": "English (GB)",
-            "es_ES": "Spanish",
-            "fr_FR": "French",
-            "de_DE": "German",
-            "it_IT": "Italian",
-            "pt_BR": "Portuguese",
-            "ar_JO": "Arabic",
-            "zh_CN": "Chinese",
-            "ja_JP": "Japanese",
-        }
-        v["language"] = lang_map.get(lang_code, lang_code)
-        v["language_code"] = lang_code
+    if not lang_code:
+        lang_code = "en_US"
+    v["language_code"] = lang_code
+    if not v.get("language") or v.get("language") == "Unknown":
+        v["language"] = _LANG_DISPLAY.get(lang_code, lang_code.replace("_", " "))
     v.setdefault("provider", "piper")
     v.setdefault("gender", "neutral")
     v.setdefault("quality", "medium")
-    v.setdefault("description", f"{v['language']} — {v.get('gender', '').title()}")
+    v.setdefault("description", f"{v['language']} — {str(v.get('gender') or 'neutral').title()}")
     return v
 
 
