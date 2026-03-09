@@ -60,12 +60,20 @@ async def _get_user_voice_profiles(
   return voices
 
 
-def _kokoro_base_url() -> str:
-  """Base URL for Kokoro API including /v1 (e.g. http://host:8880/v1)."""
-  url = (settings.KOKORO_TTS_URL or "").strip().rstrip("/")
-  if not url or "/v1" not in url:
+def _kokoro_v1_base() -> str:
+  """Derive Kokoro v1 base URL (e.g. http://host:8880/v1) from KOKORO_TTS_URL which may be full path like .../v1/audio/speech. Avoids double slashes when appending /voices or /audio/speech."""
+  base = (settings.KOKORO_TTS_URL or "").strip().rstrip("/")
+  if not base:
     return ""
-  return url[: url.find("/v1") + 4]
+  if "/audio/speech" in base:
+    base = base[: base.rfind("/audio/speech")].rstrip("/")
+  elif base.endswith("/v1"):
+    pass  # already correct base
+  if base and not base.endswith("/v1") and "/v1" in base:
+    base = base[: base.find("/v1") + 4]
+  elif base and not base.endswith("/v1"):
+    base = f"{base}/v1"
+  return base
 
 
 # Fallback Kokoro voice list when /v1/voices is unavailable (id, display name, gender)
@@ -82,12 +90,13 @@ KOKORO_VOICES_FALLBACK: list[tuple[str, str, str]] = [
 
 async def _fetch_kokoro_voices() -> list[Voice]:
   """Fetch available voices from Kokoro server (GET /v1/voices). Returns fallback list on failure."""
-  base = _kokoro_base_url()
+  base = _kokoro_v1_base()
   if not base:
     return []
+  kokoro_voices_url = f"{base}/voices"
   try:
     async with httpx.AsyncClient(timeout=10) as client:
-      resp = await client.get(f"{base}/voices")
+      resp = await client.get(kokoro_voices_url)
       if resp.status_code != 200:
         raise ValueError(f"status {resp.status_code}")
       data = resp.json()
@@ -170,13 +179,11 @@ async def get_voices(
 
 
 def _kokoro_preview_url() -> str:
-  """Full URL for Kokoro TTS preview (KOKORO_TTS_URL or base + /audio/speech)."""
-  url = (settings.KOKORO_TTS_URL or "").strip().rstrip("/")
-  if not url:
+  """Full URL for Kokoro TTS preview; uses v1 base + /audio/speech to avoid double slashes."""
+  base = _kokoro_v1_base()
+  if not base:
     return ""
-  if "/audio/" in url or url.endswith("/speech"):
-    return url
-  return f"{url}/audio/speech"
+  return f"{base}/audio/speech"
 
 
 @router.post("/preview")

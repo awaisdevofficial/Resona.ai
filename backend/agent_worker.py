@@ -244,23 +244,31 @@ async def entrypoint(ctx: JobContext):
         )
         logger.info("TTS: Cartesia")
 
-    # Use VAD for turn detection so we interrupt on voice activity immediately (no wait for STT).
-    # Only pass kwargs supported by the installed livekit-agents version (server may be older).
+    # Use VAD for turn detection; prefer TurnHandlingConfig when available (livekit-agents 1.5+).
     _session_kw: dict = {
         "vad": ctx.proc.userdata["vad"],
         "stt": stt,
         "llm": llm,
         "tts": tts,
         "turn_detection": "vad",
-        "allow_interruptions": True,
-        "min_endpointing_delay": 0.1,
-        "max_endpointing_delay": 0.6,
-        "min_interruption_duration": 0.3,
-        "min_interruption_words": 2,
         "preemptive_generation": True,
     }
-    # Self-hosted LiveKit: disable cloud barge-in (agent-gateway.livekit.cloud); use local VAD only.
-    # Optional args (supported in livekit-agents 1.5+); skip on older SDK to avoid TypeError.
+    try:
+        from livekit.agents.voice import TurnHandlingConfig
+        _session_kw["turn_handling"] = TurnHandlingConfig(
+            min_endpointing_delay=0.1,
+            max_endpointing_delay=0.6,
+            allow_interruptions=True,
+            min_interruption_duration=0.3,
+            min_interruption_words=2,
+        )
+    except ImportError:
+        _session_kw["allow_interruptions"] = True
+        _session_kw["min_endpointing_delay"] = 0.1
+        _session_kw["max_endpointing_delay"] = 0.6
+        _session_kw["min_interruption_duration"] = 0.3
+        _session_kw["min_interruption_words"] = 2
+    # Self-hosted LiveKit: disable cloud barge-in; use local VAD only. Optional args (livekit-agents 1.5+).
     try:
         from inspect import signature
         sig = signature(AgentSession.__init__)
@@ -339,12 +347,15 @@ async def entrypoint(ctx: JobContext):
         ctx.room.name,
         agent_config.get("agent_speaks_first", True),
     )
-    # Deepgram STT expects 16 kHz; set room input to 16 kHz so user voice reaches STT correctly.
+    # Deepgram STT expects 16 kHz; use RoomOptions (RoomInputOptions is deprecated).
+    room_options = voice_room_io.RoomOptions(
+        audio_input=voice_room_io.AudioInputOptions(sample_rate=16000),
+    )
     try:
         await session.start(
             agent=Agent(instructions=system_prompt, tools=[transfer_tool]),
             room=ctx.room,
-            room_input_options=voice_room_io.RoomInputOptions(audio_sample_rate=16000),
+            room_options=room_options,
         )
     except Exception as e:
         logger.exception("session.start() failed: %s", e)
