@@ -7,7 +7,11 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-from app.constants import DEFAULT_CARTESIA_VOICE_ID, get_tts_provider_and_voice_id
+from app.constants import (
+    DEFAULT_CARTESIA_VOICE_ID,
+    get_tts_provider_and_voice_id,
+    _is_cartesia_voice_id,
+)
 from app.prompts import get_full_system_prompt
 import httpx
 from livekit.agents import (
@@ -24,6 +28,17 @@ from livekit.agents.voice import room_io as voice_room_io
 from livekit.plugins import cartesia, deepgram, silero, groq
 
 load_dotenv()
+
+
+def _base_url_from_speech_url(url: str) -> str:
+    """Normalize KOKORO_TTS_URL / WHISPER_STT_URL to OpenAI-style base (e.g. http://host:port/v1)."""
+    url = (url or "").strip().rstrip("/")
+    if not url:
+        return ""
+    if "/v1" in url:
+        idx = url.find("/v1")
+        return url[: idx + 3]  # include "/v1" (no trailing slash)
+    return url if url.endswith("/v1") else f"{url}/v1"
 
 logger = logging.getLogger("resona-agent")
 logging.basicConfig(level=logging.INFO)
@@ -135,26 +150,43 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
-    # STT: Deepgram only
-    deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "").strip()
-    if not deepgram_key:
-        raise RuntimeError("DEEPGRAM_API_KEY is required for STT. Set it in the environment.")
+    # STT: self-hosted Whisper (WHISPER_STT_URL) or Deepgram
+    whisper_stt_url = os.environ.get("WHISPER_STT_URL", "").strip()
     groq_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not groq_key:
         raise RuntimeError("GROQ_API_KEY is required for the LLM. Set it in the environment.")
 
-    # STT: 200ms endpointing (25ms splits sentences mid-word); no filler_words (faster STT finalization)
-    stt = deepgram.STT(
-        model=stt_model,
-        api_key=deepgram_key,
-        language=stt_language or "en-US",
-        sample_rate=16000,
-        interim_results=True,
-        endpointing_ms=200,
-        no_delay=True,
-        vad_events=True,
-        filler_words=False,
-    )
+    if whisper_stt_url:
+        from livekit.plugins import openai as openai_plugin
+        whisper_base = _base_url_from_speech_url(whisper_stt_url)
+        if not whisper_base:
+            raise RuntimeError("WHISPER_STT_URL must be a valid URL (e.g. http://host:8000/v1/audio/transcriptions).")
+        # Self-hosted Whisper: OpenAI-compatible API; dummy key if no auth required
+        stt = openai_plugin.STT(
+            model="whisper-1",
+            language=(stt_language or "en").split("-")[0],
+            base_url=whisper_base,
+            api_key=os.environ.get("OPENAI_API_KEY", "sk-self-hosted"),
+            use_realtime=False,
+        )
+        logger.info("STT: self-hosted Whisper at %s", whisper_base)
+    else:
+        deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "").strip()
+        if not deepgram_key:
+            raise RuntimeError("DEEPGRAM_API_KEY or WHISPER_STT_URL is required for STT. Set one in the environment.")
+        # STT: 200ms endpointing; no filler_words (faster STT finalization)
+        stt = deepgram.STT(
+            model=stt_model,
+            api_key=deepgram_key,
+            language=stt_language or "en-US",
+            sample_rate=16000,
+            interim_results=True,
+            endpointing_ms=200,
+            no_delay=True,
+            vad_events=True,
+            filler_words=False,
+        )
+        logger.info("STT: Deepgram")
     # LLM: Groq primary; OpenAI as fallback on rate limit (429) or connection errors
     primary_llm = groq.LLM(
         model="llama-3.3-70b-versatile",
@@ -176,16 +208,41 @@ async def entrypoint(ctx: JobContext):
     else:
         llm = primary_llm
         logger.info("LLM: Groq only (set OPENAI_API_KEY for fallback)")
-    # TTS: Cartesia only
-    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
-    if not cartesia_key:
-        raise RuntimeError("CARTESIA_API_KEY is required for TTS. Set it in the environment.")
-    tts = cartesia.TTS(
-        model="sonic-3",
-        voice=tts_voice_id or DEFAULT_CARTESIA_VOICE_ID,
-        api_key=cartesia_key,
-        sample_rate=24000,
-    )
+    # TTS: self-hosted Kokoro (KOKORO_TTS_URL) first, then Cartesia
+    kokoro_tts_url = os.environ.get("KOKORO_TTS_URL", "").strip()
+    if kokoro_tts_url:
+        from livekit.plugins import openai as openai_plugin
+        kokoro_base = _base_url_from_speech_url(kokoro_tts_url)
+        if not kokoro_base:
+            raise RuntimeError("KOKORO_TTS_URL must be a valid URL (e.g. http://host:8880/v1/audio/speech).")
+        # Kokoro voice: use agent's tts_voice_id if set and not a Cartesia UUID, else env default.
+        raw_voice = (agent_config.get("tts_voice_id") or "").strip()
+        if _is_cartesia_voice_id(raw_voice) or not raw_voice:
+            kokoro_voice = (os.environ.get("KOKORO_TTS_VOICE", "af_heart") or "af_heart").strip()
+        else:
+            kokoro_voice = raw_voice
+        kokoro_model = os.environ.get("KOKORO_TTS_MODEL", "tts-1")
+        tts = openai_plugin.TTS(
+            model=kokoro_model,
+            voice=kokoro_voice,
+            base_url=kokoro_base,
+            api_key=os.environ.get("OPENAI_API_KEY", "sk-self-hosted"),
+            response_format="mp3",
+        )
+        logger.info("TTS: self-hosted Kokoro at %s (model=%s voice=%s)", kokoro_base, kokoro_model, kokoro_voice)
+    else:
+        cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
+        if not cartesia_key:
+            raise RuntimeError(
+                "CARTESIA_API_KEY or KOKORO_TTS_URL is required for TTS. Set one in the environment."
+            )
+        tts = cartesia.TTS(
+            model="sonic-3",
+            voice=tts_voice_id or DEFAULT_CARTESIA_VOICE_ID,
+            api_key=cartesia_key,
+            sample_rate=24000,
+        )
+        logger.info("TTS: Cartesia")
 
     # Use VAD for turn detection so we interrupt on voice activity immediately (no wait for STT).
     # Only pass kwargs supported by the installed livekit-agents version (server may be older).
