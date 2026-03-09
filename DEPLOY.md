@@ -1,6 +1,28 @@
-# Resona.ai — Production deployment
+# Resona AI — Deployment
 
-Deploy backend, frontend, and agent worker on a server (e.g. Ubuntu with Docker, or systemd for the worker).
+## Stack
+
+- **Backend:** FastAPI (Docker)
+- **Frontend:** Next.js (Docker)
+- **Agent Worker:** LiveKit agent (Docker)
+- **TTS:** Piper (self-hosted, e.g. `18.141.177.170:8880`)
+- **STT:** Whisper.cpp (self-hosted, e.g. `18.141.177.170:8002`)
+- **LLM:** Groq (`llama-3.3-70b-versatile`)
+- **Auth:** Supabase
+- **Voice / rooms:** LiveKit + SIP
+
+## Required env vars
+
+```bash
+PIPER_TTS_URL=http://18.141.177.170:8880/v1/audio/speech
+WHISPER_STT_URL=http://18.141.177.170:8002/v1/audio/transcriptions
+GROQ_API_KEY=...
+LIVEKIT_URL=...
+SUPABASE_URL=...
+# Plus DATABASE_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, INTERNAL_SECRET, SECRET_KEY, etc.
+```
+
+---
 
 ## 1. Server assumptions
 

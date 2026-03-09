@@ -1,6 +1,7 @@
 """
-Whisper STT service: self-hosted Whisper.cpp (OpenAI-compatible transcriptions).
-Uses WHISPER_STT_URL from config.
+Whisper.cpp STT service.
+Calls self-hosted Whisper.cpp server via OpenAI-compatible proxy.
+Endpoint: WHISPER_STT_URL (e.g. http://18.141.177.170:8002/v1/audio/transcriptions)
 """
 import logging
 from typing import Optional
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _whisper_base_url() -> str:
-    """Full URL for transcriptions (e.g. http://host:8000/v1/audio/transcriptions)."""
+    """Full URL for transcriptions (e.g. http://host:8002/v1/audio/transcriptions)."""
     return (settings.WHISPER_STT_URL or "").strip().rstrip("/")
 
 
@@ -24,7 +25,7 @@ async def transcribe_audio(
 ) -> str:
     """
     Transcribe audio using self-hosted Whisper.cpp (OpenAI-compatible API).
-    Returns the transcribed text. On failure logs and returns empty string or raises.
+    Returns the transcribed text. On failure logs and raises.
     """
     url = _whisper_base_url()
     if not url:

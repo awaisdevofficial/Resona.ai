@@ -19,7 +19,7 @@ class VoiceProfile(Base):
     )
 
     # Underlying provider and its voice/profile identifier
-    provider = Column(String, nullable=False)  # e.g. "deepgram", "kokoro", "cartesia"
+    provider = Column(String, nullable=False)  # e.g. "piper"
     provider_voice_id = Column(String, nullable=False)
 
     # Display information for the voice library

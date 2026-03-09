@@ -22,6 +22,20 @@ __pycache__/
 *.env.test.local
 *.env.production.local
 backend/.env
+backend/.env.production
+frontend/.env
+frontend/.env.production
+
+########################
+# Python venv
+########################
+backend/.venv/
+
+########################
+# Audio / build artifacts
+########################
+*.wav
+*.mp3
 
 ########################
 # OS / editor files

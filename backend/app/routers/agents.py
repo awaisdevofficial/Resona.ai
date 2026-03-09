@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from app.config import settings
-from app.constants import LIVEKIT_TTS_PROVIDER, get_tts_provider_and_voice_id
+from app.constants import DEFAULT_PIPER_VOICE
 import httpx as _httpx
 
 from app.database import get_db
@@ -183,9 +183,7 @@ async def _create_web_call_token_impl(
     room_name = f"webcall-{uuid.uuid4()}"
     call_id = uuid.uuid4()
 
-    tts_provider, voice_id = get_tts_provider_and_voice_id(
-        agent.tts_provider, agent.tts_voice_id
-    )
+    voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_PIPER_VOICE
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
     max_prompt = getattr(settings, "MAX_SYSTEM_PROMPT_LEN", 8000)
@@ -208,7 +206,7 @@ async def _create_web_call_token_impl(
         "llm_max_tokens": agent.llm_max_tokens or 500,
         "stt_language": agent.stt_language or "en-US",
         "stt_model": agent.stt_model or "nova-2-general",
-        "tts_provider": LIVEKIT_TTS_PROVIDER,
+        "tts_provider": "deepgram",
         "tts_voice_id": voice_id,
         "tts_stability": agent.tts_stability or 0.5,
         "silence_timeout": int(agent.silence_timeout or 30),

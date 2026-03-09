@@ -22,17 +22,13 @@ def _piper_base_url() -> str:
         if url.endswith(suffix):
             url = url[: -len(suffix)].rstrip("/")
             break
-    if not url.endswith("/v1"):
-        url = url + "/v1"
-    return url
+    return url + "/v1" if not url.endswith("/v1") else url
 
 
-PIPER_VOICES_FALLBACK: list[tuple[str, str, str]] = [
-    ("en_US-amy-medium", "Amy", "female"),
-    ("en_US-joe-medium", "Joe", "male"),
-    ("en_US-ryan-medium", "Ryan", "male"),
-    ("en_GB-alan-medium", "Alan", "male"),
-    ("en_US-kathleen-low", "Kathleen", "female"),
+PIPER_VOICES_FALLBACK = [
+    {"id": "en_US-amy-medium", "name": "Amy", "provider": "piper", "gender": "female", "language": "English"},
+    {"id": "en_US-joe-medium", "name": "Joe", "provider": "piper", "gender": "male", "language": "English"},
+    {"id": "en_US-ryan-medium", "name": "Ryan", "provider": "piper", "gender": "male", "language": "English"},
 ]
 
 
@@ -81,7 +77,14 @@ async def _fetch_piper_voices() -> list[Voice]:
         except Exception:
             pass
     return [
-        Voice(id=v[0], name=v[1], provider="piper", gender=v[2], description=f"Piper TTS — {v[2]}")
+        Voice(
+            id=v["id"],
+            name=v["name"],
+            provider=v.get("provider", "piper"),
+            gender=v.get("gender"),
+            description=v.get("description") or f"Piper TTS — {v.get('language', '')}",
+            language=v.get("language"),
+        )
         for v in PIPER_VOICES_FALLBACK
     ]
 

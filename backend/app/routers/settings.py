@@ -43,6 +43,11 @@ class TTSProviderStatus(BaseModel):
 class TTSSettingsResponse(BaseModel):
     default_provider: str
     providers: list[TTSProviderStatus]
+    tts_provider: str = "piper"
+    tts_url: Optional[str] = None
+    tts_voice: Optional[str] = None
+    stt_provider: str = "whisper_cpp"
+    stt_url: Optional[str] = None
 
 
 class SIPConfigRequest(BaseModel):
@@ -136,7 +141,15 @@ async def get_tts_settings(
             cost_display="Free (self-hosted)" if (whisper_configured and piper_configured) else "Set PIPER_TTS_URL and WHISPER_STT_URL in .env",
         )
     ]
-    return TTSSettingsResponse(default_provider=default_provider, providers=providers)
+    return TTSSettingsResponse(
+        default_provider=default_provider,
+        providers=providers,
+        tts_provider="piper",
+        tts_url=settings.PIPER_TTS_URL or None,
+        tts_voice=settings.PIPER_TTS_VOICE or None,
+        stt_provider="whisper_cpp",
+        stt_url=settings.WHISPER_STT_URL or None,
+    )
 
 
 @router.post("/sip/configure", response_model=SIPStatusResponse)

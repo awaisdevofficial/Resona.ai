@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     PIPER_TTS_VOICE: str = "en_US-amy-medium"
     PIPER_TTS_MODEL: str = "tts-1"
     WHISPER_STT_URL: str = ""
+    WHISPER_STT_MODEL: str = "whisper-1"
+    WHISPER_STT_LANGUAGE: str = "en"
 
     # Supabase
     SUPABASE_URL: str
