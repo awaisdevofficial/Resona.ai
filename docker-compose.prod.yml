@@ -46,5 +46,22 @@ services:
     depends_on:
       - backend
 
+  # Voice agent worker: joins LiveKit rooms for web test calls and SIP/Twilio calls.
+  agent_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    environment:
+      - ENV=production
+      - API_BASE_URL=http://backend:8000
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - backend
+      - redis
+    command: python agent_worker.py start
+
 volumes:
   redis_data:

@@ -169,34 +169,58 @@ async def get_voices(
   return voices
 
 
+def _kokoro_preview_url() -> str:
+  """Full URL for Kokoro TTS preview (KOKORO_TTS_URL or base + /audio/speech)."""
+  url = (settings.KOKORO_TTS_URL or "").strip().rstrip("/")
+  if not url:
+    return ""
+  if "/audio/" in url or url.endswith("/speech"):
+    return url
+  return f"{url}/audio/speech"
+
+
 @router.post("/preview")
 async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_current_user)):  # noqa: ARG001
   """
   Generate a short audio preview for a given voice & provider.
-  Supports provider: kokoro or cartesia only.
+  Uses Kokoro when provider is kokoro or when KOKORO_TTS_URL is set; Cartesia only when provider is cartesia and CARTESIA_API_KEY is set.
   """
-  provider = (body.provider or "").lower() or "kokoro"
+  provider = (body.provider or "").strip().lower()
   text = body.text.strip() or "Hi, I am your AI voice assistant, ready to help you on every call."
+  kokoro_url = _kokoro_preview_url()
+  use_kokoro = provider == "kokoro" or (not provider and bool(kokoro_url))
 
-  if provider == "kokoro":
-    kokoro_base = _kokoro_base_url()
-    if not kokoro_base:
-      raise HTTPException(status_code=400, detail="Kokoro TTS not configured (set KOKORO_TTS_URL)")
-    voice = (body.voice_id or "").strip() or (settings.KOKORO_TTS_VOICE or "af_heart").strip()
-    model = (settings.KOKORO_TTS_MODEL or "tts-1").strip()
-    async with httpx.AsyncClient(timeout=30) as client:
-      resp = await client.post(
-        f"{kokoro_base}/audio/speech",
-        headers={"Content-Type": "application/json", "Authorization": "Bearer sk-self-hosted"},
-        json={"model": model, "voice": voice, "input": text},
+  if use_kokoro:
+    if not kokoro_url:
+      raise HTTPException(
+        status_code=503,
+        detail="Kokoro TTS not configured. Set KOKORO_TTS_URL for voice preview.",
       )
-    if resp.status_code != 200:
-      raise HTTPException(status_code=502, detail="Kokoro TTS preview failed")
-    return StreamingResponse(iter([resp.content]), media_type="audio/mpeg")
+    voice_id = (body.voice_id or "").strip() or (settings.KOKORO_TTS_VOICE or "af_heart").strip()
+    payload = {
+      "model": (settings.KOKORO_TTS_MODEL or "tts-1").strip(),
+      "input": text,
+      "voice": voice_id,
+    }
+    try:
+      async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+          kokoro_url,
+          headers={"Content-Type": "application/json"},
+          json=payload,
+        )
+      if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Kokoro TTS preview failed")
+      return StreamingResponse(iter([resp.content]), media_type="audio/mpeg")
+    except httpx.HTTPError as e:
+      raise HTTPException(status_code=502, detail=f"Kokoro TTS request failed: {e!s}") from e
 
   if provider == "cartesia":
     if not settings.CARTESIA_API_KEY:
-      raise HTTPException(status_code=400, detail="Cartesia API key not configured")
+      raise HTTPException(
+        status_code=503,
+        detail="Cartesia not configured. Set CARTESIA_API_KEY for Cartesia preview.",
+      )
     voice_id = body.voice_id if _is_cartesia_voice_id(body.voice_id or "") else DEFAULT_CARTESIA_VOICE_ID
     async with httpx.AsyncClient(timeout=30) as client:
       resp = await client.post(
@@ -217,4 +241,7 @@ async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_curr
       raise HTTPException(status_code=502, detail="Cartesia TTS failed")
     return StreamingResponse(iter([resp.content]), media_type="audio/mpeg")
 
-  raise HTTPException(status_code=400, detail="Use provider 'kokoro' or 'cartesia'.")
+  raise HTTPException(
+    status_code=503,
+    detail="No TTS configured for preview. Set KOKORO_TTS_URL or CARTESIA_API_KEY and use provider 'kokoro' or 'cartesia'.",
+  )
