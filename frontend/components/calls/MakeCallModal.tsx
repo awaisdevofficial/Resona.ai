@@ -26,7 +26,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
   const [toNumber, setToNumber] = useState("");
   const [agentId, setAgentId] = useState("");
 
-  const { data: telephonyStatus } = useQuery<TelephonyStatus>({
+  const { data: telephonyStatus, isLoading: telephonyLoading } = useQuery<TelephonyStatus>({
     queryKey: ["telephony-status"],
     queryFn: () => api.get("/v1/telephony/status"),
     enabled: isOpen,
@@ -38,7 +38,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
     enabled: isOpen,
   });
 
-  const { data: phoneNumbers } = useQuery({
+  const { data: phoneNumbers, isLoading: phoneNumbersLoading } = useQuery({
     queryKey: ["phone-numbers"],
     queryFn: () => api.get("/v1/phone-numbers"),
     enabled: isOpen,
@@ -108,18 +108,31 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
   const fromNumber = agentId
     ? (phoneNumbers as any[])?.find((n: any) => n.agent_id === agentId)
     : null;
-  const hasNoNumbers = !(phoneNumbers as any[])?.length;
+  const numbersList = (phoneNumbers as any[]) ?? [];
+  const hasNoNumbers = numbersList.length === 0;
+  const stillLoading = telephonyLoading || phoneNumbersLoading;
+  const showConnectPrompt = !stillLoading && !useTelephony && hasNoNumbers;
 
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
       title="Make a Call"
-      subtitle={useTelephony ? "Call from your connected number" : hasNoNumbers ? "Connect your phone to get started" : "Choose an agent and number"}
+      subtitle={
+        stillLoading
+          ? "Loading…"
+          : useTelephony
+            ? "Call from your connected number"
+            : showConnectPrompt
+              ? "Connect your phone to get started"
+              : "Choose an agent and number"
+      }
       size="md"
     >
       <div className="space-y-4">
-                {useTelephony ? (
+                {stillLoading ? (
+                  <p className="text-sm text-white/70 py-4">Checking your phone setup…</p>
+                ) : useTelephony ? (
                   <>
                     <p className="text-sm text-white/70">
                       Call from your connected number{" "}
@@ -156,7 +169,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                       </Button>
                     </div>
                   </>
-                ) : hasNoNumbers ? (
+                ) : showConnectPrompt ? (
                   <>
                     <p className="text-sm text-white/70">
                       Connect your phone account and number in Settings to
