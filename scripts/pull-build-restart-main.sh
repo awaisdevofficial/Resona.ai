@@ -83,7 +83,11 @@ echo "Verification: $CHECKS/9 checks passed"
 
 echo ""
 echo "=== Run DB migrations (alembic) ==="
-docker-compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend alembic upgrade head 2>/dev/null || true
+if docker-compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend alembic upgrade head 2>&1; then
+  echo "OK: Alembic migrations applied."
+else
+  echo "WARN: Alembic failed or no alembic.ini (see above). Continuing."
+fi
 
 echo ""
 echo "=== Run phone_numbers migration (use_for column) ==="
