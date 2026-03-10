@@ -75,7 +75,7 @@ function IntegrationsTab() {
     queryFn: () => api.get("/v1/telephony/status"),
   })
 
-  const { data: phoneNumbers = [] } = useQuery<{ id: string; number: string; friendly_name?: string; agent_id?: string }[]>({
+  const { data: phoneNumbers = [] } = useQuery<{ id: string; number: string; friendly_name?: string; agent_id?: string; use_for?: string; is_active?: boolean }[]>({
     queryKey: ["phone-numbers"],
     queryFn: () => api.get("/v1/phone-numbers"),
     enabled: !!status?.is_connected,
@@ -144,8 +144,9 @@ function IntegrationsTab() {
 
   const importNumbers = useMutation({
     mutationFn: () => api.post("/v1/phone-numbers/import", {}),
-    onSuccess: (data: { imported?: number }) => {
-      toast.success(`Imported ${data?.imported ?? 0} number(s). Assign an agent below.`)
+    onSuccess: (data: { imported?: number; numbers?: string[] }) => {
+      const n = data?.imported ?? (Array.isArray(data?.numbers) ? data.numbers.length : 0)
+      toast.success(`Imported ${n} number(s). Link them to agents when you save an agent.`)
       qc.invalidateQueries({ queryKey: ["phone-numbers"] })
     },
     onError: () => toast.error("Failed to import. Connect phone account above first."),
@@ -155,15 +156,6 @@ function IntegrationsTab() {
     mutationFn: (agentId: string) => api.patch("/v1/telephony/assign-agent", { agent_id: agentId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["telephony-status"] })
-    },
-    onError: () => toast.error("Failed to assign agent"),
-  })
-
-  const assignNumberAgent = useMutation({
-    mutationFn: ({ numberId, agentId }: { numberId: string; agentId: string | null }) =>
-      api.patch(`/v1/phone-numbers/${numberId}`, { agent_id: agentId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["phone-numbers"] })
     },
     onError: () => toast.error("Failed to assign agent"),
   })
@@ -179,10 +171,10 @@ function IntegrationsTab() {
   const primaryNumber = status?.phone_number ?? null
   const importedOnly = phoneNumbers.filter((n) => n.number !== primaryNumber)
   const hasPrimaryRow = !!primaryNumber
-  type Row = { id: string; number: string; agent_id?: string; isPrimary: boolean }
+  type Row = { id: string; number: string; agent_id?: string; use_for?: string; isPrimary: boolean; is_active?: boolean }
   const allRows: Row[] = hasPrimaryRow
-    ? [{ id: "primary", number: primaryNumber, agent_id: status?.assigned_agent_id ?? undefined, isPrimary: true }, ...importedOnly.map((n) => ({ id: n.id, number: n.number, agent_id: n.agent_id, isPrimary: false }))]
-    : importedOnly.map((n) => ({ id: n.id, number: n.number, agent_id: n.agent_id, isPrimary: false }))
+    ? [{ id: "primary", number: primaryNumber, agent_id: status?.assigned_agent_id ?? undefined, use_for: "both", isPrimary: true }, ...importedOnly.map((n) => ({ id: n.id, number: n.number, agent_id: n.agent_id, use_for: n.use_for ?? "both", isPrimary: false, is_active: n.is_active }))]
+    : importedOnly.map((n) => ({ id: n.id, number: n.number, agent_id: n.agent_id, use_for: n.use_for ?? "both", isPrimary: false, is_active: n.is_active }))
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -195,7 +187,7 @@ function IntegrationsTab() {
               Phone & Numbers
             </h3>
             <p className="text-sm text-white/70 mt-0.5">
-              Connect once here with Twilio credentials and your number. Then use Phone Numbers to import more numbers and assign agents; use Calls to make outbound calls.
+              Connect with Twilio, then import your numbers here. Link numbers to agents when you save each agent (optional).
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -328,14 +320,14 @@ function IntegrationsTab() {
         </div>
       )}
 
-      {/* Numbers & agents: one table, import, assign agent per number */}
+      {/* All phone numbers: import here, link to agents when saving an agent */}
       {status?.is_connected && (
         <div className="bg-white/5 border border-white/10 rounded-xl shadow-card p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-semibold text-white">Numbers & agents</h3>
+              <h3 className="text-base font-semibold text-white">Phone numbers</h3>
               <p className="text-sm text-white/70 mt-0.5">
-                Assign an agent to each number. Inbound calls to that number will be handled by the assigned agent.
+                Import numbers from Twilio. Link them to agents when you save an agent (optional).
               </p>
             </div>
             <button
@@ -344,17 +336,17 @@ function IntegrationsTab() {
               disabled={importNumbers.isPending}
               className={cn(
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium",
-                "bg-white/5 border border-white/10 text-white hover:bg-white/10/80 transition-colors disabled:opacity-50"
+                "bg-[#4DFFCE]/15 border border-[#4DFFCE]/40 text-[#4DFFCE] hover:bg-[#4DFFCE]/25 transition-colors disabled:opacity-50"
               )}
             >
               <RefreshCw size={14} className={importNumbers.isPending ? "animate-spin" : ""} />
-              {importNumbers.isPending ? "Importing…" : "Import more numbers"}
+              {importNumbers.isPending ? "Importing…" : "Import numbers"}
             </button>
           </div>
 
           {allRows.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 bg-white/5/30 py-8 px-4 text-center">
-              <p className="text-sm text-white/70">No numbers yet. Connect above, then use &quot;Import more numbers&quot; to sync your numbers.</p>
+              <p className="text-sm text-white/70">No numbers yet. Click &quot;Import numbers&quot; to sync from Twilio.</p>
               <button
                 type="button"
                 onClick={() => importNumbers.mutate()}
@@ -370,56 +362,68 @@ function IntegrationsTab() {
                 <thead>
                   <tr className="bg-white/5/50 border-b border-white/10">
                     <th className="text-left py-3 px-4 font-medium text-white/70">Number</th>
-                    <th className="text-left py-3 px-4 font-medium text-white/70">Agent</th>
+                    <th className="text-left py-3 px-4 font-medium text-white/70">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-white/70">Linked to agent</th>
+                    <th className="text-left py-3 px-4 font-medium text-white/70">Use for</th>
                     <th className="w-12 py-3 px-2" />
                   </tr>
                 </thead>
                 <tbody>
-                  {allRows.map((row) => (
-                    <tr key={row.id} className="border-b border-white/10 last:border-0 hover:bg-white/10/30 transition-colors">
-                      <td className="py-3 px-4">
-                        <span className="font-mono text-white">{row.number}</span>
-                        {row.isPrimary && (
-                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#4DFFCE]/20 text-[#4DFFCE] font-medium">Primary</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <select
-                          value={row.isPrimary ? (status?.assigned_agent_id ?? "") : (row.agent_id ?? "")}
-                          onChange={(e) => {
-                            const id = e.target.value || null
-                            if (row.isPrimary) {
-                              if (id) assignTelephonyAgent.mutate(id)
-                            } else {
-                              assignNumberAgent.mutate({ numberId: row.id, agentId: id })
-                            }
-                          }}
-                          className="w-full max-w-[200px] px-3 py-2 border border-white/10 rounded-lg bg-white/5 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30"
-                        >
-                          <option value="">No agent</option>
-                          {agents.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-3 px-2 text-right">
-                        {row.isPrimary ? (
-                          <span className="text-xs text-white/70">—</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm(`Release ${row.number}?`)) releaseNumber.mutate(row.id)
-                            }}
-                            className="p-1.5 rounded text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Release number"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {allRows.map((row) => {
+                    const agentName = row.agent_id ? (agents.find((a) => a.id === row.agent_id)?.name ?? "—") : "—"
+                    const useForLabel = row.use_for === "inbound" ? "Inbound" : row.use_for === "outbound" ? "Outbound" : "Inbound & outbound"
+                    return (
+                      <tr key={row.id} className="border-b border-white/10 last:border-0 hover:bg-white/10/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <span className="font-mono text-white">{row.number}</span>
+                          {row.isPrimary && (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#4DFFCE]/20 text-[#4DFFCE] font-medium">Primary</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={row.isPrimary || row.is_active !== false ? "text-emerald-400" : "text-white/50"}>
+                            {row.isPrimary || row.is_active !== false ? "Active" : "Released"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          {row.isPrimary ? (
+                            <select
+                              value={status?.assigned_agent_id ?? ""}
+                              onChange={(e) => {
+                                const id = e.target.value
+                                if (id) assignTelephonyAgent.mutate(id)
+                              }}
+                              className="w-full max-w-[180px] px-2 py-1.5 border border-white/10 rounded-lg bg-white/5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#4DFFCE]/50"
+                            >
+                              <option value="">No agent</option>
+                              {agents.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-white/80">{agentName}</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-white/70">{useForLabel}</td>
+                        <td className="py-3 px-2 text-right">
+                          {row.isPrimary ? (
+                            <span className="text-xs text-white/50">—</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Release ${row.number}?`)) releaseNumber.mutate(row.id)
+                              }}
+                              className="p-1.5 rounded text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Release number"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

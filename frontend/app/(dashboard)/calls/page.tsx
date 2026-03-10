@@ -135,8 +135,8 @@ export default function CallsPage() {
               Settings
             </Link>
             , then import numbers in{" "}
-            <Link href="/phone-numbers" className="underline font-medium text-[#4DFFCE] hover:no-underline">
-              Phone Numbers
+            <Link href="/settings" className="underline font-medium text-[#4DFFCE] hover:no-underline">
+              Settings → Integrations
             </Link>
             .
           </p>
@@ -388,8 +388,8 @@ export default function CallsPage() {
                     ) : (
                       <p className="text-sm text-white/60">
                         Your connected number from Settings will be used. To assign this agent to a number, edit the agent or go to{" "}
-                        <Link href="/phone-numbers" className="underline font-medium text-[#4DFFCE]">
-                          Phone Numbers
+                        <Link href="/settings" className="underline font-medium text-[#4DFFCE]">
+                          Settings → Integrations
                         </Link>
                         .
                       </p>

@@ -20,7 +20,6 @@ import { cn } from "@/components/lib-utils";
 const mainNav = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
   { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/phone-numbers", label: "Phone Numbers", icon: Phone },
   { href: "/calls", label: "Calls", icon: PhoneCall },
   { href: "/knowledge-base", label: "Knowledge Base", icon: BookOpen },
   { href: "/webhooks", label: "Webhooks", icon: Webhook },

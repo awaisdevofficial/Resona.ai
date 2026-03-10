@@ -80,8 +80,8 @@ export default function AgentEditPage({
   const [activeTab, setActiveTab] = useState<"config" | "knowledge">("config")
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [voiceLibraryOpen, setVoiceLibraryOpen] = useState(false)
-  const [assignedPhoneNumberId, setAssignedPhoneNumberId] = useState<string | "">("")
-  const [assignedUseFor, setAssignedUseFor] = useState<"inbound" | "outbound" | "both">("both")
+  type LinkedNumber = { numberId: string; useFor: "inbound" | "outbound" | "both" }
+  const [linkedNumbers, setLinkedNumbers] = useState<LinkedNumber[]>([])
 
   const { data: agent, isLoading } = useQuery({
     queryKey: ["agent", params.id],
@@ -130,15 +130,13 @@ export default function AgentEditPage({
 
   useEffect(() => {
     if (!agent?.id || !phoneNumbers.length) return
-    const assigned = phoneNumbers.find((n) => String(n.agent_id ?? "") === String(agent.id))
-    if (assigned) {
-      setAssignedPhoneNumberId(assigned.id)
-      const u = assigned.use_for === "inbound" || assigned.use_for === "outbound" ? assigned.use_for : "both"
-      setAssignedUseFor(u)
-    } else {
-      setAssignedPhoneNumberId("")
-      setAssignedUseFor("both")
-    }
+    const assigned = phoneNumbers.filter((n) => String(n.agent_id ?? "") === String(agent.id))
+    setLinkedNumbers(
+      assigned.map((n) => ({
+        numberId: n.id,
+        useFor: (n.use_for === "inbound" || n.use_for === "outbound" ? n.use_for : "both") as "inbound" | "outbound" | "both",
+      }))
+    )
   }, [agent?.id, phoneNumbers])
 
   const watchedName = form.watch("name")
@@ -167,10 +165,9 @@ export default function AgentEditPage({
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: async (payload: {
       values: AgentFormValues
-      phoneNumberId: string | null
-      useFor: string
+      linkedNumbers: LinkedNumber[]
     }) => {
-      const { values, phoneNumberId, useFor } = payload
+      const { values, linkedNumbers: links } = payload
       const updatedAgent = await api.patch(`/v1/agents/${params.id}`, {
         ...FIXED_DEFAULTS,
         ...values,
@@ -183,14 +180,17 @@ export default function AgentEditPage({
       }) as any
       const numbers = (await api.get("/v1/phone-numbers")) as { id: string; agent_id?: string }[]
       for (const n of numbers) {
-        if (String(n.agent_id ?? "") === String(params.id) && n.id !== phoneNumberId) {
-          await api.patch(`/v1/phone-numbers/${n.id}`, { agent_id: null, use_for: "both" })
+        if (String(n.agent_id ?? "") === String(params.id)) {
+          const stillLinked = links.some((l) => l.numberId === n.id)
+          if (!stillLinked) {
+            await api.patch(`/v1/phone-numbers/${n.id}`, { agent_id: null, use_for: "both" })
+          }
         }
       }
-      if (phoneNumberId) {
-        await api.patch(`/v1/phone-numbers/${phoneNumberId}`, {
+      for (const link of links) {
+        await api.patch(`/v1/phone-numbers/${link.numberId}`, {
           agent_id: params.id,
-          use_for: useFor || "both",
+          use_for: link.useFor,
         })
       }
       return updatedAgent
@@ -329,8 +329,7 @@ export default function AgentEditPage({
                 onClick={form.handleSubmit((v) =>
                   save({
                     values: v,
-                    phoneNumberId: assignedPhoneNumberId || null,
-                    useFor: assignedUseFor,
+                    linkedNumbers,
                   })
                 )}
                 disabled={saving}
@@ -621,58 +620,84 @@ export default function AgentEditPage({
               <div className="px-6 py-4 border-b border-white/10 bg-white/[0.03]">
                 <h2 className="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
                   <Phone size={16} />
-                  Phone number
+                  Link phone numbers (optional)
                 </h2>
                 <p className="text-xs text-white/60 mt-0.5">
-                  Assign a number to this agent for inbound calls, outbound calls, or both.
+                  Connect numbers to this agent when you save. Add one or more; choose inbound, outbound, or both. You can skip.
                 </p>
               </div>
               <div className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="form-label">Number for this agent</label>
-                  <select
-                    value={assignedPhoneNumberId}
-                    onChange={(e) => setAssignedPhoneNumberId(e.target.value)}
-                    className="form-input max-w-md"
-                  >
-                    <option value="">None</option>
-                    {phoneNumbers.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.number}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-white/60">
-                    Import numbers in{" "}
-                    <Link href="/phone-numbers" className="text-[#4DFFCE] hover:underline">Phone Numbers</Link>
-                    . This agent will handle calls for the selected number.
-                  </p>
-                </div>
-                {assignedPhoneNumberId && (
-                  <div className="space-y-2">
-                    <label className="form-label">Use for</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(["both", "inbound", "outbound"] as const).map((opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => setAssignedUseFor(opt)}
-                          className={cn(
-                            "px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
-                            assignedUseFor === opt
-                              ? "bg-[#4DFFCE] text-[#07080A] border-[#4DFFCE]"
-                              : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white"
-                          )}
-                        >
-                          {opt === "both" ? "Inbound & outbound" : opt === "inbound" ? "Inbound only" : "Outbound only"}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-white/60">
-                      Inbound: calls to this number go to this agent. Outbound: when making a call with this agent, this number is used as caller ID.
-                    </p>
-                  </div>
+                {linkedNumbers.length > 0 && (
+                  <ul className="space-y-3">
+                    {linkedNumbers.map((link, idx) => {
+                      const num = phoneNumbers.find((n) => n.id === link.numberId)
+                      return (
+                        <li key={`${link.numberId}-${idx}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                          <span className="font-mono text-sm text-white min-w-[120px]">{num?.number ?? link.numberId}</span>
+                          <div className="flex gap-1">
+                            {(["both", "inbound", "outbound"] as const).map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() =>
+                                  setLinkedNumbers((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, useFor: opt } : p))
+                                  )
+                                }
+                                className={cn(
+                                  "px-2 py-1 rounded text-xs font-medium",
+                                  link.useFor === opt ? "bg-[#4DFFCE] text-[#07080A]" : "bg-white/10 text-white/70 hover:bg-white/15"
+                                )}
+                              >
+                                {opt === "both" ? "Both" : opt === "inbound" ? "Inbound" : "Outbound"}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setLinkedNumbers((prev) => prev.filter((_, i) => i !== idx))}
+                            className="ml-auto text-white/50 hover:text-red-400 text-xs"
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
+                <div className="flex flex-wrap items-end gap-2">
+                  <select
+                    id="add-number-select"
+                    className="form-input max-w-[200px]"
+                    defaultValue=""
+                  >
+                    <option value="">Add a number…</option>
+                    {phoneNumbers
+                      .filter((n) => !linkedNumbers.some((l) => l.numberId === n.id))
+                      .map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.number}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sel = document.getElementById("add-number-select") as HTMLSelectElement
+                      const id = sel?.value
+                      if (id) {
+                        setLinkedNumbers((prev) => [...prev, { numberId: id, useFor: "both" }])
+                        sel.value = ""
+                      }
+                    }}
+                    className="btn-secondary text-sm py-2"
+                  >
+                    Add number
+                  </button>
+                </div>
+                <p className="text-[11px] text-white/60">
+                  Import numbers in Settings → Integrations. Inbound: calls to this number use this agent. Outbound: this number is used as caller ID. You can skip linking numbers.
+                </p>
               </div>
             </section>
 
