@@ -139,23 +139,30 @@ async def add_voice_clone(
     name = name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Voice name is required.")
-    # Build multipart for ElevenLabs: name + files
+    # Ensure voice name is valid UTF-8 so ElevenLabs accepts the request
+    try:
+        name = name.encode("utf-8", errors="replace").decode("utf-8")
+    except Exception:
+        name = "Voice"
+    # Build multipart for ElevenLabs: name + files (use ASCII filenames to avoid invalid UTF-8 in headers)
     file_contents = []
-    for f in files:
+    for i, f in enumerate(files):
         content = await f.read()
         if len(content) < 1000:
             raise HTTPException(status_code=400, detail="Audio file too short; use at least a few seconds of clear speech.")
-        file_contents.append((f.filename or "audio.mp3", content, f.content_type or "audio/mpeg"))
+        ext = "mp3"
+        if f.filename and "." in f.filename:
+            ext = f.filename.rsplit(".", 1)[-1].lower() or "mp3"
+        if ext not in ("mp3", "wav", "m4a", "ogg", "flac", "webm"):
+            ext = "mp3"
+        safe_filename = f"audio_{i + 1}.{ext}"
+        file_contents.append((safe_filename, content, f.content_type or "audio/mpeg"))
     if not file_contents:
         raise HTTPException(status_code=400, detail="At least one audio file is required.")
     last_err: Exception | None = None
     for api_key in keys:
         try:
             async with httpx.AsyncClient(timeout=60) as client:
-                multipart = {"name": (None, name)}
-                for i, (filename, content, ctype) in enumerate(file_contents):
-                    multipart[f"files"] = (filename, content, ctype)
-                # httpx expects list of tuples for multiple files with same key
                 parts = [("name", (None, name))]
                 for filename, content, ctype in file_contents:
                     parts.append(("files", (filename, content, ctype)))
