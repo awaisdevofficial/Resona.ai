@@ -29,10 +29,11 @@ class AgentCreate(BaseModel):
     llm_temperature: float = Field(0.8, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(300, ge=50, le=4000)
     stt_provider: str = "elevenlabs"
-    stt_model: str = "nova-2-general"
+    stt_model: str = "scribe_v2_realtime"
     stt_language: str = "en-US"
     tts_provider: str = "elevenlabs"
     tts_voice_id: Optional[str] = None
+    tts_model: Optional[str] = None  # eleven_turbo_v2_5 (fast) or eleven_multilingual_v2 (quality)
     tts_stability: float = Field(0.45, ge=0.0, le=1.0)
     silence_timeout: int = Field(30, ge=5, le=300)
     max_duration: int = Field(3600, ge=60, le=14400)
@@ -85,6 +86,7 @@ class AgentUpdate(BaseModel):
     stt_language: Optional[str] = None
     tts_provider: Optional[str] = None
     tts_voice_id: Optional[str] = None
+    tts_model: Optional[str] = None
     tts_stability: Optional[float] = None
     silence_timeout: Optional[int] = None
     max_duration: Optional[int] = None
@@ -107,6 +109,7 @@ class AgentResponse(BaseModel):
     stt_language: str
     tts_provider: str
     tts_voice_id: Optional[str]
+    tts_model: Optional[str]
     tts_stability: float
     silence_timeout: int
     max_duration: int

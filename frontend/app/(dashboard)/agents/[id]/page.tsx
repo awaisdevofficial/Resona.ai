@@ -15,14 +15,14 @@ import { VoiceLibrary, Voice } from "@/components/agents/VoiceLibrary"
 import { DarkSelect } from "@/components/shared/DarkSelect"
 
 const FIXED_DEFAULTS = {
-  llm_model: "gpt-4o-mini",
-  llm_temperature: 0.7,
-  llm_max_tokens: 500,
+  llm_model: "gpt-4o",
+  llm_temperature: 0.8,
+  llm_max_tokens: 300,
   stt_provider: "elevenlabs",
   stt_model: "scribe_v2_realtime",
   stt_language: "en-US",
   tts_provider: "elevenlabs",
-  tts_stability: 0.5,
+  tts_stability: 0.45,
 }
 
 const LANGUAGE_OPTIONS = [

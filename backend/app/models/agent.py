@@ -31,10 +31,11 @@ class Agent(Base):
     llm_temperature = Column(Float, default=0.8)  # Slight variety for less robotic tone
     llm_max_tokens = Column(Integer, default=300)  # Shorter for real-time voice
     stt_provider = Column(String, default="elevenlabs")
-    stt_model = Column(String, default="nova-2-general")
+    stt_model = Column(String, default="scribe_v2_realtime")
     stt_language = Column(String, default="en-US")
     tts_provider = Column(String, default="elevenlabs")
     tts_voice_id = Column(String, nullable=True)
+    tts_model = Column(String, nullable=True)  # eleven_turbo_v2_5 or eleven_multilingual_v2
     tts_stability = Column(Float, default=0.45)  # Slightly lower = more expressive, less robotic
     silence_timeout = Column(Integer, default=30)
     max_duration = Column(Integer, default=3600)

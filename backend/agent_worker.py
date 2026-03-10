@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-os.environ.setdefault("OPENAI_TIMEOUT", "60")
+os.environ.setdefault("OPENAI_TIMEOUT", "30")
 
 # Load backend .env so DATABASE_URL, etc. are found when worker runs from any cwd
 _backend_dir = Path(__file__).resolve().parent
@@ -114,6 +114,8 @@ async def entrypoint(ctx: JobContext):
                 "first_message": "Hey, hi! What can I do for you?",
                 "tts_provider": "elevenlabs",
                 "tts_voice_id": app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o",
+                "tts_model": app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5",
+                "stt_model": app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime",
                 "llm_model": "gpt-4o",
                 "llm_temperature": 0.8,
                 "llm_max_tokens": 300,
@@ -156,19 +158,24 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
-    # STT — ElevenLabs Scribe
+    # STT — ElevenLabs Scribe (best real-time: low latency, high accuracy)
     elevenlabs_key = (app_settings.ELEVENLABS_API_KEY or "").strip()
     if not elevenlabs_key:
         raise RuntimeError("ELEVENLABS_API_KEY is not configured. Cannot start agent worker.")
 
     from livekit.plugins import elevenlabs as elevenlabs_plugin
 
+    stt_model_id = (
+        (agent_config.get("stt_model") or "").strip()
+        or app_settings.ELEVENLABS_STT_MODEL
+        or "scribe_v2_realtime"
+    )
     stt = elevenlabs_plugin.STT(
         api_key=elevenlabs_key,
-        model_id=app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime",
+        model_id=stt_model_id,
         language_code=(stt_language or "en").split("-")[0],
     )
-    logger.info("STT: ElevenLabs (%s)", app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime")
+    logger.info("STT: ElevenLabs (%s)", stt_model_id)
 
     # LLM — OpenAI; use agent config for model/temperature/max_tokens (more human, real-time)
     from livekit.plugins import openai as openai_plugin
@@ -177,27 +184,38 @@ async def entrypoint(ctx: JobContext):
     if not openai_key:
         raise RuntimeError("OPENAI_API_KEY is required for the LLM. Set it in DB (system_settings) or environment.")
 
+    # LLM — gpt-4o best for fast, natural voice; fallback to config/env
     llm_model = (agent_config.get("llm_model") or "gpt-4o").strip()
     llm_temperature = float(agent_config.get("llm_temperature", 0.8))
     llm_max_tokens = int(agent_config.get("llm_max_tokens", 300))
-    # Clamp for real-time: shorter replies feel more natural; temp 0.7–0.9 for variety
     llm_temperature = max(0.5, min(1.0, llm_temperature))
     llm_max_tokens = max(100, min(800, llm_max_tokens))
 
-    llm = openai_plugin.LLM(
-        model=llm_model,
-        api_key=openai_key,
-        temperature=llm_temperature,
-        max_completion_tokens=llm_max_tokens,
-    )
+    llm_kw: dict = {
+        "model": llm_model,
+        "api_key": openai_key,
+        "temperature": llm_temperature,
+        "max_completion_tokens": llm_max_tokens,
+    }
+    try:
+        timeout_sec = float(os.environ.get("OPENAI_TIMEOUT", "30"))
+        if timeout_sec > 0:
+            import httpx
+            llm_kw["timeout"] = httpx.Timeout(timeout_sec)
+    except (TypeError, ValueError):
+        pass
+    llm = openai_plugin.LLM(**llm_kw)
     logger.info("LLM: OpenAI (%s, temp=%.2f, max_tokens=%d)", llm_model, llm_temperature, llm_max_tokens)
 
-    # TTS — ElevenLabs best-for-calling model + voice settings for natural, non-robotic sound
+    # TTS — eleven_turbo_v2_5: best latency for real-time; eleven_multilingual_v2 for max quality
     raw_voice = (agent_config.get("tts_voice_id") or "").strip()
     default_voice = (app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o").strip()
-    # Piper-style IDs contain locale underscore (en_US-...); ElevenLabs IDs are alphanumeric/hyphen only, no underscore
     tts_voice_id = default_voice if (not raw_voice or "_" in raw_voice) else raw_voice
-    tts_model = (agent_config.get("tts_model") or app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5").strip()
+    tts_model = (
+        (agent_config.get("tts_model") or "").strip()
+        or app_settings.ELEVENLABS_TTS_MODEL
+        or "eleven_turbo_v2_5"
+    ).strip()
     # Stability: lower = more expressive (less robotic); similarity_boost: higher = closer to voice character
     tts_stability = float(agent_config.get("tts_stability", getattr(app_settings, "ELEVENLABS_TTS_STABILITY", 0.45)))
     tts_similarity = float(getattr(app_settings, "ELEVENLABS_TTS_SIMILARITY_BOOST", 0.75))
@@ -225,21 +243,22 @@ async def entrypoint(ctx: JobContext):
         "turn_detection": "vad",
         "preemptive_generation": True,
     }
+    # Fast turn-taking: low endpointing delay = quicker first response; allow barge-in
     try:
         from livekit.agents.voice import TurnHandlingConfig
 
         _session_kw["turn_handling"] = TurnHandlingConfig(
-            min_endpointing_delay=0.1,
-            max_endpointing_delay=0.6,
+            min_endpointing_delay=0.05,
+            max_endpointing_delay=0.5,
             allow_interruptions=True,
-            min_interruption_duration=0.3,
+            min_interruption_duration=0.25,
             min_interruption_words=2,
         )
     except ImportError:
         _session_kw["allow_interruptions"] = True
-        _session_kw["min_endpointing_delay"] = 0.1
-        _session_kw["max_endpointing_delay"] = 0.6
-        _session_kw["min_interruption_duration"] = 0.3
+        _session_kw["min_endpointing_delay"] = 0.05
+        _session_kw["max_endpointing_delay"] = 0.5
+        _session_kw["min_interruption_duration"] = 0.25
         _session_kw["min_interruption_words"] = 2
 
     # Add optional params only if AgentSession accepts them
