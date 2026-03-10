@@ -17,6 +17,7 @@ from app.models.agent import Agent
 from app.models.telephony import UserTelephonyConfig
 from app.models.user import User
 from app.services.call_service import make_outbound_call
+from app.services.livekit_setup import LiveKitSetupService
 from app.services.telephony_onboarding import onboard_user_telephony
 from app.services.telephony_teardown import teardown_user_telephony
 
@@ -54,6 +55,10 @@ class AssignAgentRequest(BaseModel):
     agent_id: str
 
 
+class CompleteSetupBody(BaseModel):
+    twilio_phone_number: str
+
+
 class CallBody(BaseModel):
     to_phone_number: str
 
@@ -71,12 +76,18 @@ async def connect_telephony(
     db: AsyncSession = Depends(get_db),
 ):
     """Connect user's Twilio account and phone number; create trunk + LiveKit SIP resources."""
+    phone = (body.twilio_phone_number or "").strip()
+    if not phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Twilio phone number is required (e.g. +1234567890).",
+        )
     try:
         config = await onboard_user_telephony(
             user_id=str(user.id),
             twilio_account_sid=body.twilio_account_sid,
             twilio_auth_token=body.twilio_auth_token,
-            phone_number=body.twilio_phone_number.strip(),
+            phone_number=phone,
             db=db,
             sip_server_ip=settings.SIP_SERVER_IP,
         )
@@ -90,6 +101,79 @@ async def connect_telephony(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/complete-setup", response_model=ConnectResponse)
+async def complete_telephony_setup(
+    body: CompleteSetupBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Complete telephony setup when you have Twilio config but missing phone number or LiveKit trunks.
+    Runs LiveKit inbound/dispatch/outbound creation and updates the config.
+    """
+    phone_number = (body.twilio_phone_number or "").strip()
+    if not phone_number:
+        raise HTTPException(
+            status_code=400,
+            detail="twilio_phone_number is required (e.g. +1234567890)",
+        )
+    result = await db.execute(
+        select(UserTelephonyConfig).where(UserTelephonyConfig.user_id == user.id)
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(
+            status_code=400,
+            detail="No telephony config. Connect in Settings first with Twilio credentials and number.",
+        )
+    if config.livekit_outbound_trunk_id:
+        return ConnectResponse(
+            status="connected",
+            inbound_trunk_id=config.livekit_inbound_trunk_id,
+            outbound_trunk_id=config.livekit_outbound_trunk_id,
+            dispatch_rule_id=config.livekit_dispatch_rule_id,
+        )
+    if not config.twilio_trunk_sid or not config.twilio_sip_username:
+        raise HTTPException(
+            status_code=400,
+            detail="Config missing trunk or SIP credentials. Disconnect and reconnect in Settings with Twilio credentials and phone number.",
+        )
+    sip_password = config.get_decrypted("twilio_sip_password")
+    if not sip_password:
+        raise HTTPException(
+            status_code=400,
+            detail="SIP password not found. Disconnect and reconnect in Settings.",
+        )
+    lk_svc = LiveKitSetupService()
+    try:
+        inbound_trunk_id = await lk_svc.create_inbound_trunk(phone_number, str(user.id))
+        dispatch_rule_id = await lk_svc.create_dispatch_rule(inbound_trunk_id, str(user.id))
+        outbound_trunk_id = await lk_svc.create_outbound_trunk(
+            phone_number,
+            config.twilio_trunk_sid,
+            config.twilio_sip_username,
+            sip_password,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"LiveKit setup failed: {getattr(e, 'message', str(e))}",
+        )
+    config.twilio_phone_number = phone_number
+    config.livekit_inbound_trunk_id = inbound_trunk_id
+    config.livekit_dispatch_rule_id = dispatch_rule_id
+    config.livekit_outbound_trunk_id = outbound_trunk_id
+    config.is_active = True
+    await db.commit()
+    await db.refresh(config)
+    return ConnectResponse(
+        status="connected",
+        inbound_trunk_id=inbound_trunk_id,
+        outbound_trunk_id=outbound_trunk_id,
+        dispatch_rule_id=dispatch_rule_id,
+    )
 
 
 @router.delete("/disconnect", response_model=DisconnectResponse)

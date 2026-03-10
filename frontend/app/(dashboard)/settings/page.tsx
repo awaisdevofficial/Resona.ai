@@ -68,6 +68,7 @@ function IntegrationsTab() {
   const [authToken, setAuthToken] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [showToken, setShowToken] = useState(false)
+  const [completeSetupNumber, setCompleteSetupNumber] = useState("")
 
   const { data: status } = useQuery<TelephonyStatus>({
     queryKey: ["telephony-status"],
@@ -120,6 +121,26 @@ function IntegrationsTab() {
     },
     onError: () => toast.error("Failed to disconnect"),
   })
+
+  const completeSetup = useMutation({
+    mutationFn: () =>
+      api.post("/v1/telephony/complete-setup", {
+        twilio_phone_number: completeSetupNumber.trim(),
+      }),
+    onSuccess: () => {
+      toast.success("Setup complete. You can make and receive calls now.")
+      setCompleteSetupNumber("")
+      qc.invalidateQueries({ queryKey: ["telephony-status"] })
+      qc.invalidateQueries({ queryKey: ["phone-numbers"] })
+    },
+    onError: (err: any) => {
+      const msg = typeof err?.message === "string" ? err.message : "Complete setup failed."
+      toast.error(msg)
+    },
+  })
+
+  const needsCompleteSetup =
+    status?.is_connected && (!status?.outbound_trunk_id || !status?.inbound_trunk_id)
 
   const importNumbers = useMutation({
     mutationFn: () => api.post("/v1/phone-numbers/import", {}),
@@ -273,6 +294,39 @@ function IntegrationsTab() {
           </div>
         )}
       </div>
+
+      {/* Complete setup: add number and create LiveKit trunks when config exists but trunks are null */}
+      {needsCompleteSetup && (
+        <div className="glass-card p-6 border-amber-500/30 bg-amber-500/5">
+          <h3 className="text-base font-semibold text-amber-400 flex items-center gap-2 mb-1">
+            <RefreshCw size={18} />
+            Complete setup
+          </h3>
+          <p className="text-sm text-white/70 mb-4">
+            Your Twilio account is linked but call trunks were not created. Enter your Twilio phone number below to create them (no need to re-enter credentials).
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px]">
+              <label className="block text-xs font-medium text-white/70 mb-1">Twilio phone number (E.164)</label>
+              <input
+                type="tel"
+                value={completeSetupNumber}
+                onChange={(e) => setCompleteSetupNumber(e.target.value)}
+                placeholder="+12025551234"
+                className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm font-mono bg-white/5 focus:outline-none focus:border-[#4DFFCE]/50"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => completeSetup.mutate()}
+              disabled={!completeSetupNumber.trim() || completeSetup.isPending}
+              className="btn-primary disabled:opacity-50"
+            >
+              {completeSetup.isPending ? "Creating trunks…" : "Complete setup"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Numbers & agents: one table, import, assign agent per number */}
       {status?.is_connected && (

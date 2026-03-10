@@ -182,7 +182,7 @@ async def make_outbound_call(
             status_code=400,
             detail={
                 "error": "sip_not_configured",
-                "message": "Please complete Twilio phone setup in Settings first. If you just connected, ensure LiveKit created the outbound trunk (check that inbound/outbound trunk IDs are not null in the connect response).",
+                "message": "Phone setup is incomplete. In Settings → Integrations, use \"Complete setup\" to add your Twilio number and create call trunks, or disconnect and reconnect with your number.",
                 "setup_url": "/settings",
             },
         )
