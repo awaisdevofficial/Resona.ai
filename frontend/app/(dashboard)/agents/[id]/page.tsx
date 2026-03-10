@@ -83,6 +83,7 @@ export default function AgentEditPage({
   const { data: agent, isLoading } = useQuery({
     queryKey: ["agent", params.id],
     queryFn: () => api.get(`/v1/agents/${params.id}`) as Promise<any>,
+    staleTime: 30_000, // 30s — avoid refetch on tab focus for faster feel
   })
 
   const form = useForm<AgentFormValues>({
@@ -133,6 +134,7 @@ export default function AgentEditPage({
     queryKey: ["voices"],
     queryFn: () => api.get("/v1/voices") as Promise<Voice[]>,
     enabled: voiceLibraryOpen || !!voiceId,
+    staleTime: 90_000, // 90s — backend caches voices; avoid refetch on every open
   })
   const displayVoiceName = useMemo(() => {
     const vid = (voiceId || "").trim()

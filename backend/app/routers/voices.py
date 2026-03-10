@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from typing import List
 
 import httpx
@@ -18,6 +19,12 @@ from app.models.user import User
 router = APIRouter()
 
 ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1"
+
+# In-memory cache for voices list to avoid hitting ElevenLabs on every request (faster page loads)
+_voices_cache: list | None = None
+_voices_cache_at: float = 0
+VOICES_CACHE_TTL_SEC = 90
+VOICES_HTTP_TIMEOUT = 8
 
 
 def _elevenlabs_headers(api_key: str, json_content_type: bool = True) -> dict:
@@ -79,7 +86,11 @@ class VoicePreviewRequest(BaseModel):
 
 
 async def _fetch_elevenlabs_voices() -> list[Voice]:
-    """Fetch voices from ElevenLabs; try next api-keys row on failure."""
+    """Fetch voices from ElevenLabs; try next api-keys row on failure. Uses short-lived cache."""
+    global _voices_cache, _voices_cache_at
+    now = time.monotonic()
+    if _voices_cache is not None and (now - _voices_cache_at) < VOICES_CACHE_TTL_SEC:
+        return _voices_cache
     keys = get_elevenlabs_keys_ordered()
     if not keys:
         logger.debug("No ELEVENLABS_API_KEY in api-keys table")
@@ -87,7 +98,7 @@ async def _fetch_elevenlabs_voices() -> list[Voice]:
     last_err: Exception | None = None
     for api_key in keys:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with httpx.AsyncClient(timeout=VOICES_HTTP_TIMEOUT) as client:
                 resp = await client.get(
                     f"{ELEVENLABS_API_BASE}/voices",
                     headers=_elevenlabs_headers(api_key),
@@ -95,10 +106,13 @@ async def _fetch_elevenlabs_voices() -> list[Voice]:
                 if resp.status_code == 200:
                     data = resp.json()
                     voices_list = data.get("voices") if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                    return [
+                    result = [
                         Voice(**_enrich_elevenlabs_voice(v if isinstance(v, dict) else {"voice_id": str(v), "name": str(v)}))
                         for v in voices_list
                     ]
+                    _voices_cache = result
+                    _voices_cache_at = time.monotonic()
+                    return result
                 last_err = RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             last_err = e
@@ -180,6 +194,9 @@ async def add_voice_clone(
             if resp.status_code == 200:
                 data = resp.json()
                 voice_id = data.get("voice_id") or data.get("id")
+                # Invalidate voices cache so new clone appears in list
+                global _voices_cache
+                _voices_cache = None
                 if voice_id:
                     return {"voice_id": voice_id, "name": name_clean, "message": "Voice clone created. It will appear in the library."}
                 return {"voice_id": None, "name": name_clean, "message": "Voice clone created."}
