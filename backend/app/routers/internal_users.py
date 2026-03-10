@@ -9,7 +9,9 @@ from app.database import get_db
 from app.middleware.auth import verify_internal_secret
 from app.models.agent import Agent
 from app.models.knowledge_base import KnowledgeBase
+from app.models.phone_number import PhoneNumber
 from app.models.telephony import UserTelephonyConfig
+from app.models.user_settings import UserSettings
 from app.prompts import get_full_system_prompt
 
 
@@ -25,13 +27,13 @@ async def get_default_agent_config(
     Return the default agent configuration for a user, used by the agent worker
     to handle inbound SIP calls where the room is created by a dispatch rule.
 
-    If the user has a telephony config with an assigned agent, use that agent.
-    Otherwise pick the first active agent (most recently created) for the user.
+    Prefer: 1) UserTelephonyConfig.assigned_agent_id, 2) agent assigned to user's
+    number in phone_numbers (Settings SIP), 3) first active agent for user.
     """
     user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
     agent = None
 
-    # Check if user has a specific agent assigned to their phone number
+    # 1) Telephony/connect: assigned agent on UserTelephonyConfig
     tel_result = await db.execute(
         select(UserTelephonyConfig).where(
             UserTelephonyConfig.user_id == user_uuid,
@@ -50,6 +52,32 @@ async def get_default_agent_config(
         if assigned_agent:
             agent = assigned_agent
 
+    # 2) Settings SIP: agent assigned to user's from-number in phone_numbers
+    if not agent:
+        settings_result = await db.execute(
+            select(UserSettings).where(
+                UserSettings.user_id == user_uuid,
+                UserSettings.sip_configured.is_(True),
+                UserSettings.twilio_from_number.isnot(None),
+            )
+        )
+        user_settings = settings_result.scalar_one_or_none()
+        if user_settings and user_settings.twilio_from_number:
+            pn_result = await db.execute(
+                select(PhoneNumber).where(
+                    PhoneNumber.user_id == user_uuid,
+                    PhoneNumber.number == user_settings.twilio_from_number,
+                    PhoneNumber.is_active.is_(True),
+                    PhoneNumber.agent_id.isnot(None),
+                )
+            )
+            pn = pn_result.scalar_one_or_none()
+            if pn and pn.agent_id:
+                agent = await db.get(Agent, pn.agent_id)
+                if agent and not agent.is_active:
+                    agent = None
+
+    # 3) Fallback: first active agent for user
     if not agent:
         result = await db.execute(
             select(Agent)
@@ -85,6 +113,6 @@ async def get_default_agent_config(
         "llm_max_tokens": agent.llm_max_tokens or 300,
         "knowledge_base": knowledge_base,
         "agent_speaks_first": True,
-        "transfer_number": (agent.tools_config or {}).get("transfer_number", ""),
+        "transfer_number": getattr(agent, "transfer_number", None) or (agent.tools_config or {}).get("transfer_number", ""),
     }
 

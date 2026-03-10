@@ -23,6 +23,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.phone_number import PhoneNumber
 from app.models.user import User
 from app.models.user_settings import UserSettings
+from app.models.telephony import UserTelephonyConfig
 from app.models.webhook import Webhook
 from app.schemas.call import (
     CallCreate,
@@ -151,18 +152,37 @@ async def make_outbound_call(
     if not to_number:
         raise HTTPException(status_code=400, detail="to_number is required")
 
-    # Get user SIP settings
+    # Get user SIP settings: prefer UserSettings (Settings → SIP), fallback to UserTelephonyConfig (telephony/connect)
     result = await db.execute(
         select(UserSettings).where(UserSettings.user_id == user.id)
     )
     user_settings = result.scalar_one_or_none()
 
-    if not user_settings or not user_settings.sip_configured:
+    outbound_trunk_id: Optional[str] = None
+    from_number: Optional[str] = None
+
+    if user_settings and user_settings.sip_configured and user_settings.livekit_outbound_trunk_id:
+        outbound_trunk_id = user_settings.livekit_outbound_trunk_id
+        from_number = user_settings.twilio_from_number
+
+    if not outbound_trunk_id:
+        tel_result = await db.execute(
+            select(UserTelephonyConfig).where(
+                UserTelephonyConfig.user_id == user.id,
+                UserTelephonyConfig.livekit_outbound_trunk_id.isnot(None),
+            )
+        )
+        telephony_config = tel_result.scalar_one_or_none()
+        if telephony_config and telephony_config.livekit_outbound_trunk_id:
+            outbound_trunk_id = telephony_config.livekit_outbound_trunk_id
+            from_number = telephony_config.twilio_phone_number
+
+    if not outbound_trunk_id:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "sip_not_configured",
-                "message": "Please complete Twilio phone setup in Settings first",
+                "message": "Please complete Twilio phone setup in Settings first. If you just connected, ensure LiveKit created the outbound trunk (check that inbound/outbound trunk IDs are not null in the connect response).",
                 "setup_url": "/settings",
             },
         )
@@ -222,7 +242,7 @@ async def make_outbound_call(
         direction="outbound",
         status="ringing",
         to_number=to_number,
-        from_number=user_settings.twilio_from_number,
+        from_number=from_number,
         livekit_room=room_name,
     )
     db.add(call)
@@ -230,7 +250,7 @@ async def make_outbound_call(
 
     # Initiate outbound SIP call via LiveKit
     await make_outbound_sip_call(
-        outbound_trunk_id=user_settings.livekit_outbound_trunk_id,
+        outbound_trunk_id=outbound_trunk_id,
         to_number=to_number,
         room_name=room_name,
     )

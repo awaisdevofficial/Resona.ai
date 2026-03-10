@@ -31,6 +31,7 @@ from app.models.agent import Agent
 from app.models.call import Call
 from app.models.knowledge_base import KnowledgeBase
 from app.models.phone_number import PhoneNumber
+from app.models.telephony import UserTelephonyConfig
 
 
 router = APIRouter()
@@ -43,6 +44,11 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     from_number = form.get("From", "")
     twilio_sid = form.get("CallSid", "")
 
+    # Resolve agent: 1) phone_numbers (Settings Integrations), 2) UserTelephonyConfig (telephony/connect)
+    agent = None
+    phone_record = None
+    user_id_for_call = None
+
     result = await db.execute(
         select(PhoneNumber).where(
             PhoneNumber.number == to_number,
@@ -50,14 +56,30 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
         )
     )
     phone_record = result.scalar_one_or_none()
+    if phone_record and phone_record.agent_id:
+        agent = await db.get(Agent, phone_record.agent_id)
+        if agent:
+            user_id_for_call = agent.user_id
 
-    if not phone_record or not phone_record.agent_id:
+    if not agent:
+        tel_result = await db.execute(
+            select(UserTelephonyConfig).where(
+                UserTelephonyConfig.twilio_phone_number == to_number,
+                UserTelephonyConfig.assigned_agent_id.isnot(None),
+            )
+        )
+        telephony_config = tel_result.scalar_one_or_none()
+        if telephony_config and telephony_config.assigned_agent_id:
+            agent = await db.get(Agent, telephony_config.assigned_agent_id)
+            if agent and agent.user_id == telephony_config.user_id:
+                user_id_for_call = agent.user_id
+
+    if not agent or not user_id_for_call:
         twiml = VoiceResponse()
         twiml.say("This number has no agent assigned. Goodbye.")
         twiml.hangup()
         return Response(str(twiml), media_type="application/xml")
 
-    agent = await db.get(Agent, phone_record.agent_id)
     await db.refresh(agent)
 
     room_name = f"call-{uuid.uuid4()}"
@@ -95,8 +117,8 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     call = Call(
         id=call_id,
         agent_id=agent.id,
-        user_id=agent.user_id,
-        phone_number_id=phone_record.id,
+        user_id=user_id_for_call,
+        phone_number_id=phone_record.id if phone_record else None,
         direction="inbound",
         status="ringing",
         to_number=to_number,
