@@ -54,8 +54,9 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
 
   const agentsList = (agents as any[]) ?? [];
   const numbersList = (phoneNumbers as any[]) ?? [];
+  // Match by string so UUID from API matches dropdown value
   const fromNumber = agentId
-    ? numbersList.find((n: any) => n.agent_id === agentId)
+    ? numbersList.find((n: any) => String(n?.agent_id ?? "").toLowerCase() === String(agentId).toLowerCase())
     : null;
 
   const handleStartCall = () => {
@@ -122,15 +123,15 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                     </span>
                   </p>
                 ) : (
-                  <p className="text-sm text-amber-400">
-                    No number assigned to this agent.{" "}
+                  <p className="text-sm text-white/60">
+                    Your connected number from Settings will be used. To assign this agent to a specific number, go to{" "}
                     <Link
                       href="/settings"
                       className="underline font-medium text-[#4DFFCE]"
                     >
                       Settings → Integrations
-                    </Link>{" "}
-                    to add or assign a number.
+                    </Link>
+                    .
                   </p>
                 )}
               </div>
@@ -157,7 +158,6 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                 disabled={
                   !toNumber.trim() ||
                   !agentId ||
-                  !fromNumber ||
                   makeOutboundCall.isPending
                 }
               >
