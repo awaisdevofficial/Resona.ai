@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
-import { Headphones, Search, X } from "lucide-react"
+import { Headphones, Mic, Search, X } from "lucide-react"
+import toast from "react-hot-toast"
 import { Button } from "@/components/ui/Button"
 import { API_BASE_URL, getAuthToken } from "@/lib/api"
 import { cn } from "@/components/lib-utils"
@@ -101,6 +102,10 @@ export function VoiceLibrary({
   const [languageFilter, setLanguageFilter] = useState<string>("all")
   const [previewingId, setPreviewingId] = useState<string | null>(null)
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
+  const [cloneOpen, setCloneOpen] = useState(false)
+  const [cloneName, setCloneName] = useState("")
+  const [cloneFiles, setCloneFiles] = useState<FileList | null>(null)
+  const [cloneSubmitting, setCloneSubmitting] = useState(false)
 
   const {
     data: voices = [],
@@ -339,6 +344,82 @@ export function VoiceLibrary({
                 </div>
               </div>
 
+              {/* Clone voice section */}
+              <div className="px-6 py-3 border-b border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setCloneOpen((o) => !o)}
+                  className="flex items-center gap-2 text-sm font-medium text-white/90 hover:text-white"
+                >
+                  <Mic size={16} />
+                  Clone a voice
+                </button>
+                {cloneOpen && (
+                  <div className="mt-3 p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                    <p className="text-xs text-white/70">
+                      Upload 1+ audio samples (MP3/WAV, a few seconds of clear speech). The new voice will appear in the library.
+                    </p>
+                    <input
+                      type="text"
+                      value={cloneName}
+                      onChange={(e) => setCloneName(e.target.value)}
+                      placeholder="Voice name"
+                      className="form-input w-full max-w-xs"
+                    />
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      multiple
+                      onChange={(e) => setCloneFiles(e.target.files)}
+                      className="block text-xs text-white/70 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-[#4DFFCE]/20 file:text-[#4DFFCE]"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={!cloneName.trim() || !cloneFiles?.length || cloneSubmitting}
+                        onClick={async () => {
+                          if (!cloneName.trim() || !cloneFiles?.length) return
+                          setCloneSubmitting(true)
+                          try {
+                            const token = await getAuthToken()
+                            const form = new FormData()
+                            form.append("name", cloneName.trim())
+                            for (let i = 0; i < cloneFiles.length; i++) {
+                              form.append("files", cloneFiles[i])
+                            }
+                            const res = await fetch(`${API_BASE_URL}/v1/voices/add`, {
+                              method: "POST",
+                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                              body: form,
+                            })
+                            const data = await res.json().catch(() => ({}))
+                            if (!res.ok) {
+                              const msg = (data as { detail?: string })?.detail || res.statusText
+                              throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg))
+                            }
+                            toast.success("Voice clone created. It will appear in the library.")
+                            setCloneName("")
+                            setCloneFiles(null)
+                            setCloneOpen(false)
+                            refetch()
+                          } catch (e) {
+                            toast.error((e as Error)?.message || "Clone failed")
+                          } finally {
+                            setCloneSubmitting(false)
+                          }
+                        }}
+                      >
+                        {cloneSubmitting ? "Creating…" : "Create clone"}
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setCloneOpen(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="p-6 overflow-y-auto space-y-4">
                 {isLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -400,7 +481,7 @@ export function VoiceLibrary({
                                 </span>
                               </div>
                               <p className="mt-0.5 text-xs text-white/70">
-                                {voice.language || "Unknown"}
+                                {voice.language || voice.description || "Unknown"}
                                 <span className="ml-1.5 text-white/50">{genderIcon}</span>
                               </p>
                               {voice.quality && (

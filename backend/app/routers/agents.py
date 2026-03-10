@@ -215,7 +215,7 @@ async def _create_web_call_token_impl(
         "user_id": str(user.id),
         "user_email": user.email,
         "system_prompt": full_system_prompt,
-        "first_message": (agent.first_message or "")[:2000],
+        "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip()[:2000],
         "llm_model": agent.llm_model or "gpt-4o-mini",
         "llm_temperature": agent.llm_temperature or 0.7,
         "llm_max_tokens": agent.llm_max_tokens or 500,

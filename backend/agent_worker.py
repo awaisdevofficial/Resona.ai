@@ -110,20 +110,23 @@ async def entrypoint(ctx: JobContext):
 
         if not agent_config:
             agent_config = {
-                "system_prompt": "You are a helpful voice AI assistant.",
-                "first_message": "Hi, how can I help?",
+                "system_prompt": "You are a helpful, friendly voice assistant. Keep replies short and natural.",
+                "first_message": "Hey, hi! What can I do for you?",
                 "tts_provider": "elevenlabs",
                 "tts_voice_id": app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o",
             }
 
+    # User's system prompt is primary; we only wrap it with real-time + human-behavior instructions
     base_system_prompt = agent_config.get(
         "system_prompt",
-        "You are a helpful, friendly voice AI assistant. Keep responses short and conversational.",
+        "You are a helpful, friendly voice assistant. Keep replies short and conversational.",
     )
+    if not (base_system_prompt or "").strip():
+        base_system_prompt = "You are a helpful, friendly voice assistant. Keep replies short and natural."
     kb_content = agent_config.get("knowledge_base", "")
     if kb_content:
         base_system_prompt = (
-            base_system_prompt
+            base_system_prompt.strip()
             + "\n\n=== KNOWLEDGE BASE ===\n"
             + kb_content
             + "\n=== END KNOWLEDGE BASE ==="
@@ -132,7 +135,8 @@ async def entrypoint(ctx: JobContext):
         system_prompt = base_system_prompt
     else:
         system_prompt = get_full_system_prompt(base_system_prompt)
-    first_message = agent_config.get("first_message", "Hi, how can I help?")
+    # User's first message is always used when provided
+    first_message = (agent_config.get("first_message") or "Hey, hi! What can I do for you?").strip()
 
     stt_language = agent_config.get("stt_language", "en-US")
 
@@ -314,7 +318,7 @@ async def entrypoint(ctx: JobContext):
         raise
 
     agent_speaks_first = agent_config.get("agent_speaks_first", True)
-    say_text = (first_message or "Hi, how can I help?").strip()
+    say_text = first_message or "Hey, hi! What can I do for you?"
     if agent_speaks_first and say_text:
         try:
             await session.say(say_text, allow_interruptions=True)

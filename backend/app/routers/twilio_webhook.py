@@ -72,7 +72,7 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     tts_voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_ELEVENLABS_VOICE_ID
     metadata = json.dumps({
         "system_prompt": full_system_prompt,
-        "first_message": agent.first_message or "Hi, how can I help you today?",
+        "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip(),
         "stt_provider": "elevenlabs",
         "stt_language": agent.stt_language or "en-US",
         "tts_provider": "elevenlabs",

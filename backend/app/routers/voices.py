@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -30,8 +30,16 @@ def _enrich_elevenlabs_voice(raw: dict) -> dict:
     voice_id = raw.get("voice_id") or raw.get("id", "")
     name = raw.get("name", "Unknown")
     labels = raw.get("labels") or {}
+    if isinstance(labels, str):
+        labels = {}
     gender = (labels.get("gender") or "neutral").lower()
-    description = labels.get("description") or f"{name} — {gender}"
+    description = labels.get("description") or raw.get("description") or f"{name} — {gender}"
+    # Use labels for language so UI does not show "Unknown"
+    _lang = labels.get("language") or labels.get("accent") or raw.get("language")
+    lang = (_lang or "English").strip() if _lang else "English"
+    _lc = labels.get("language_code") or raw.get("language_code")
+    lang_code = (_lc or "en").strip() if _lc else "en"
+    is_custom = raw.get("category") == "cloned" or raw.get("category") == "generated"
     return {
         "id": voice_id,
         "name": name,
@@ -39,9 +47,10 @@ def _enrich_elevenlabs_voice(raw: dict) -> dict:
         "gender": gender,
         "description": description,
         "preview_url": raw.get("preview_url"),
-        "language": None,
-        "language_code": None,
+        "language": lang if lang else "English",
+        "language_code": lang_code if lang_code else "en",
         "quality": None,
+        "is_custom": is_custom,
     }
 
 
@@ -112,6 +121,67 @@ async def list_voices(user: User = Depends(get_current_user)):  # noqa: ARG001
             detail="ElevenLabs voices unavailable. Add keys in api-keys table.",
         )
     return voices
+
+
+@router.post("/add")
+async def add_voice_clone(
+    name: str = Form(..., min_length=1, max_length=100),
+    files: List[UploadFile] = File(..., min_length=1),
+    user: User = Depends(get_current_user),  # noqa: ARG001
+):
+    """
+    Create a cloned voice via ElevenLabs (instant voice cloning).
+    Upload one or more audio files and a name; the new voice appears in the voice library.
+    """
+    keys = get_elevenlabs_keys_ordered()
+    if not keys:
+        raise HTTPException(status_code=503, detail="Add an ElevenLabs API key in Settings → API Keys.")
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Voice name is required.")
+    # Build multipart for ElevenLabs: name + files
+    file_contents = []
+    for f in files:
+        content = await f.read()
+        if len(content) < 1000:
+            raise HTTPException(status_code=400, detail="Audio file too short; use at least a few seconds of clear speech.")
+        file_contents.append((f.filename or "audio.mp3", content, f.content_type or "audio/mpeg"))
+    if not file_contents:
+        raise HTTPException(status_code=400, detail="At least one audio file is required.")
+    last_err: Exception | None = None
+    for api_key in keys:
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                multipart = {"name": (None, name)}
+                for i, (filename, content, ctype) in enumerate(file_contents):
+                    multipart[f"files"] = (filename, content, ctype)
+                # httpx expects list of tuples for multiple files with same key
+                parts = [("name", (None, name))]
+                for filename, content, ctype in file_contents:
+                    parts.append(("files", (filename, content, ctype)))
+                resp = await client.post(
+                    f"{ELEVENLABS_API_BASE}/voices/add",
+                    headers=_elevenlabs_headers(api_key),
+                    files=parts,
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                voice_id = data.get("voice_id") or data.get("id")
+                if voice_id:
+                    return {"voice_id": voice_id, "name": name, "message": "Voice clone created. It will appear in the library."}
+                return {"voice_id": None, "name": name, "message": "Voice clone created."}
+            last_err = HTTPException(
+                status_code=min(resp.status_code, 502),
+                detail=resp.text[:300] if resp.text else "ElevenLabs failed to create voice.",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            last_err = e
+            logger.debug("ElevenLabs /voices/add failed with key: %s", e)
+    if last_err:
+        raise HTTPException(status_code=502, detail=f"Voice cloning failed: {last_err!s}")
+    raise HTTPException(status_code=502, detail="Voice cloning failed.")
 
 
 @router.post("/preview")
