@@ -158,7 +158,7 @@ export function VoiceLibrary({
         },
         body: JSON.stringify({
           voice_id: voice.id,
-          provider: "piper",
+          provider: (voice.provider || "elevenlabs").toLowerCase(),
           text: "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
       })
@@ -193,13 +193,11 @@ export function VoiceLibrary({
   }, [voices])
 
   const filteredVoices = useMemo(() => {
-    const piperOnly = voices.filter((v) => {
-      const p = (v.provider || "").toLowerCase()
-      return p === "piper" || p === "kokoro"
-    })
-    return piperOnly.filter((v) => {
-      if (tab === "english" && !(v.language_code || "").toLowerCase().startsWith("en")) return false
-      if (tab === "other" && (v.language_code || "").toLowerCase().startsWith("en")) return false
+    // Include ElevenLabs, Piper, and Kokoro (no filter by provider)
+    return voices.filter((v) => {
+      const lc = (v.language_code || "").toLowerCase().trim()
+      if (tab === "english" && lc && !lc.startsWith("en")) return false
+      if (tab === "other" && lc && lc.startsWith("en")) return false
       if (languageFilter !== "all" && (v.language || "Unknown") !== languageFilter) return false
       if (!search.trim()) return true
       const q = search.toLowerCase()
