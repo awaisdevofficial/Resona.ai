@@ -3,7 +3,7 @@
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { cn } from "@/components/lib-utils";
 
 interface UserFooterProps {
@@ -29,6 +29,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
   const plan = "Pro";
 
   async function handleLogout() {
+    const supabase = await getSupabase();
     await supabase.auth.signOut();
     router.replace("/sign-in");
   }

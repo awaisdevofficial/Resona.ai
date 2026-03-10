@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react"
 import type { Session } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabaseClient"
+import { getSupabase } from "@/lib/supabaseClient"
 
 interface AuthContextValue {
   session: Session | null
@@ -23,28 +23,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true
+    let subscription: { unsubscribe: () => void } | null = null
 
     async function init() {
+      const supabase = await getSupabase()
       const {
-        data: { session },
+        data: { session: s },
       } = await supabase.auth.getSession()
       if (!isMounted) return
-      setSession(session)
+      setSession(s)
       setLoading(false)
+      const {
+        data: { subscription: sub },
+      } = supabase.auth.onAuthStateChange((_event, s2) => {
+        setSession(s2)
+        setLoading(false)
+      })
+      subscription = sub
     }
 
     init()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setLoading(false)
-    })
-
     return () => {
       isMounted = false
-      subscription.unsubscribe()
+      subscription?.unsubscribe()
     }
   }, [])
 

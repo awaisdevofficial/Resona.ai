@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient"
+import { getSupabase } from "./supabaseClient"
 
 const raw = typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
 /** Base URL of the backend API (no trailing slash). Set NEXT_PUBLIC_API_URL in .env. */
@@ -6,6 +6,7 @@ export const API_BASE_URL = raw ? String(raw).replace(/\/+$/, "") : "http://loca
 
 export async function getAuthToken(): Promise<string | null> {
   if (typeof window === "undefined") return null
+  const supabase = await getSupabase()
   const {
     data: { session },
   } = await supabase.auth.getSession()

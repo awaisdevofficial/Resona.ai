@@ -54,8 +54,9 @@ class Settings(BaseSettings):
     ELEVENLABS_STT_MODEL: str = "scribe_v2_realtime"
     ELEVENLABS_TTS_MODEL: str = "eleven_turbo_v2_5"
 
-    # Supabase
+    # Supabase (service role for backend auth; anon key for frontend sign-in via /config/public)
     SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str
 
     # Stripe

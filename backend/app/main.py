@@ -96,3 +96,13 @@ app.include_router(
 async def health():
     return {"status": "ok"}
 
+
+@app.get("/config/public")
+async def config_public():
+    """Public config for frontend (Supabase URL + anon key). No auth required."""
+    url = (getattr(settings, "SUPABASE_URL", None) or "").strip()
+    anon = (getattr(settings, "SUPABASE_ANON_KEY", None) or "").strip()
+    if not url or not anon:
+        return {"supabase_url": "", "supabase_anon_key": ""}
+    return {"supabase_url": url, "supabase_anon_key": anon}
+

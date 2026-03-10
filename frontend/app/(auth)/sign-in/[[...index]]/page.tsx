@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function SignInPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const supabase = await getSupabase();
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
