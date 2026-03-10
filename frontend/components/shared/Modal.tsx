@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { X } from "lucide-react"
 import type { ReactNode } from "react"
 import { useEffect } from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/components/lib-utils"
 
 const MODAL_Z = 9998
@@ -51,7 +52,7 @@ export function Modal({
     return () => document.removeEventListener("keydown", handler)
   }, [open, onClose])
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       {open && (
         <>
@@ -125,4 +126,7 @@ export function Modal({
       )}
     </AnimatePresence>
   )
+
+  if (typeof document === "undefined") return modalContent
+  return createPortal(modalContent, document.body)
 }
