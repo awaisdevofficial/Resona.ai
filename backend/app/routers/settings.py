@@ -16,6 +16,7 @@ from app.models.phone_number import PhoneNumber
 from app.models.user import User
 from app.models.user_settings import UserSettings
 from app.services.sip_service import delete_user_sip, setup_user_sip
+from app.system_settings import get_elevenlabs_keys_ordered
 
 
 router = APIRouter()
@@ -127,28 +128,39 @@ async def get_tts_settings(
     user: User = Depends(get_current_user),  # noqa: ARG001
 ):
     """
-    Return TTS/STT provider status. Only Piper + Whisper.cpp (self-hosted) are supported.
+    Return TTS/STT provider status. ElevenLabs (primary) and optional self-hosted Piper + Whisper.
     """
-    whisper_configured = bool(_base_url_from_speech_url(settings.WHISPER_STT_URL))
-    piper_configured = bool(_base_url_from_speech_url(settings.PIPER_TTS_URL))
-    default_provider = "whisper_kokoro"
+    piper_url = getattr(settings, "PIPER_TTS_URL", None) or ""
+    piper_voice = getattr(settings, "PIPER_TTS_VOICE", None) or ""
+    whisper_url = getattr(settings, "WHISPER_STT_URL", None) or ""
+    whisper_configured = bool(_base_url_from_speech_url(whisper_url))
+    piper_configured = bool(_base_url_from_speech_url(piper_url))
+    elevenlabs_configured = bool(get_elevenlabs_keys_ordered())
+    default_provider = "elevenlabs" if elevenlabs_configured else "whisper_kokoro"
     providers = [
         TTSProviderStatus(
-            id="whisper_kokoro",
-            label="Self-hosted (Whisper.cpp STT + Piper TTS)",
-            configured=whisper_configured and piper_configured,
+            id="elevenlabs",
+            label="Resona Voice (ElevenLabs)",
+            configured=elevenlabs_configured,
             recommended=True,
-            cost_display="Free (self-hosted)" if (whisper_configured and piper_configured) else "Set PIPER_TTS_URL and WHISPER_STT_URL in .env",
-        )
+            cost_display="Add keys in Settings → API Keys" if not elevenlabs_configured else "Configured",
+        ),
+        TTSProviderStatus(
+            id="whisper_kokoro",
+            label="Self-hosted (Whisper + Piper)",
+            configured=whisper_configured and piper_configured,
+            recommended=False,
+            cost_display="Free (self-hosted)" if (whisper_configured and piper_configured) else "Set PIPER_TTS_URL and WHISPER_STT_URL",
+        ),
     ]
     return TTSSettingsResponse(
         default_provider=default_provider,
         providers=providers,
-        tts_provider="piper",
-        tts_url=settings.PIPER_TTS_URL or None,
-        tts_voice=settings.PIPER_TTS_VOICE or None,
+        tts_provider="elevenlabs" if elevenlabs_configured else "piper",
+        tts_url=piper_url.strip() or None,
+        tts_voice=piper_voice.strip() or None,
         stt_provider="whisper_cpp",
-        stt_url=settings.WHISPER_STT_URL or None,
+        stt_url=whisper_url.strip() or None,
     )
 
 

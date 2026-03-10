@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     ELEVENLABS_DEFAULT_VOICE_ID: str = "bIHbv24MWmeRgasZH58o"  # Rachel (ElevenLabs default)
     ELEVENLABS_STT_MODEL: str = "scribe_v2_realtime"
     ELEVENLABS_TTS_MODEL: str = "eleven_turbo_v2_5"
+    # Optional self-hosted TTS/STT (Piper / Whisper) for /settings/tts
+    PIPER_TTS_URL: str = ""
+    PIPER_TTS_VOICE: str = ""
+    WHISPER_STT_URL: str = ""
 
     # Supabase (service role for backend auth; anon key for frontend sign-in via /config/public)
     SUPABASE_URL: str
