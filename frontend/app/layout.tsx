@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AuthProvider>{children}</AuthProvider>
           <Toaster
             position="top-right"
+            containerStyle={{ position: "fixed", zIndex: 99999 }}
             toastOptions={{
               duration: 4000,
               style: {
