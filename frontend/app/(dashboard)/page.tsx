@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Bot, Clock, DollarSign, Phone } from "lucide-react";
+import { ArrowRight, Bot, Clock, DollarSign, Phone, Radio } from "lucide-react";
 
 import { MetricCard } from "@/components/analytics/MetricCard";
 import { CallVolumeChart } from "@/components/analytics/CallVolumeChart";
@@ -141,6 +141,9 @@ export default function DashboardPage() {
               <ArrowRight size={14} />
             </Link>
           </div>
+          <p className="text-xs text-white/50 mb-3">
+            Active call? Click &quot;🔴 Monitor&quot; below or on <Link href="/calls" className="text-[#4DFFCE]/80 hover:underline">Calls</Link> for live transcript.
+          </p>
           <RecentCallsList calls={recentCallsList} />
         </div>
       </div>
@@ -163,36 +166,52 @@ function RecentCallsList({ calls }: { calls: any[] }) {
   }
   return (
     <div className="space-y-3">
-      {calls.map((call) => (
-        <div
-          key={call.id}
-          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                call.direction === "inbound" ? "bg-blue-500/15" : "bg-purple-500/15"
-              }`}
-            >
-              <Phone
-                size={14}
-                className={
-                  call.direction === "inbound" ? "text-blue-400" : "text-purple-400"
-                }
-              />
+      {calls.map((call) => {
+        const isActive =
+          (call.status === "ringing" || call.status === "in_progress") &&
+          call.livekit_room;
+        return (
+          <div
+            key={call.id}
+            className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  call.direction === "inbound" ? "bg-blue-500/15" : "bg-purple-500/15"
+                }`}
+              >
+                <Phone
+                  size={14}
+                  className={
+                    call.direction === "inbound" ? "text-blue-400" : "text-purple-400"
+                  }
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">
+                  {call.agent_name ?? call.from_number ?? call.to_number ?? "—"}
+                </p>
+                <p className="text-xs text-white/65">
+                  {call.to_number ?? call.from_number ?? call.direction ?? "—"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-white">
-                {call.agent_name ?? call.from_number ?? call.to_number ?? "—"}
-              </p>
-              <p className="text-xs text-white/65">
-                {call.to_number ?? call.from_number ?? call.direction ?? "—"}
-              </p>
+            <div className="flex items-center gap-2">
+              {isActive && (
+                <Link
+                  href={`/live-calls/${call.livekit_room}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/40 transition-colors"
+                >
+                  <Radio size={12} />
+                  Monitor
+                </Link>
+              )}
+              <CallStatusBadge status={call.status ?? "completed"} />
             </div>
           </div>
-          <CallStatusBadge status={call.status ?? "completed"} />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
