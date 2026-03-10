@@ -15,6 +15,6 @@ if [ ! -f backend/.env.production ]; then
 fi
 
 echo "=== Running phone_numbers migration (use_for, etc.) in backend container ==="
-docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend python scripts/run_migrate_phone_numbers.py
+docker-compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend python scripts/run_migrate_phone_numbers.py
 
-echo "Done. Restart backend if needed: docker compose -f $COMPOSE_FILE -p $PROJECT_NAME restart backend"
+echo "Done. Restart backend if needed: docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME restart backend"
