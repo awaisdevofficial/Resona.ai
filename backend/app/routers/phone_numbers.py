@@ -51,8 +51,8 @@ async def list_numbers(
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Database migration required. On the server, run from backend dir: "
-                    "ENV=production python scripts/run_migrate_phone_numbers.py"
+                    "Database migration required. On the server run: "
+                    "cd /home/ubuntu/resona.ai && bash scripts/run-migrate-phone-numbers-docker.sh"
                 ),
             ) from e
         raise

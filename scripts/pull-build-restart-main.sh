@@ -62,6 +62,10 @@ echo "=== Run DB migrations (alembic) ==="
 docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend alembic upgrade head 2>/dev/null || true
 
 echo ""
+echo "=== Run phone_numbers migration (use_for column) ==="
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file backend/.env.production run --rm backend python scripts/run_migrate_phone_numbers.py 2>/dev/null || true
+
+echo ""
 echo "=== Build and restart (deploy-main) ==="
 bash scripts/deploy-main.sh
 
