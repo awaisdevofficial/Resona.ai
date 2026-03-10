@@ -3,13 +3,22 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js"
 /** Use same base URL as api.ts so /config/public hits the backend (e.g. origin/api when in prod). */
 function getApiBase(): string {
   const raw = typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
-  if (raw && String(raw).trim()) return String(raw).replace(/\/+$/, "")
-  if (typeof window !== "undefined" && window.location?.origin) {
+  let base: string
+  if (raw && String(raw).trim()) {
+    base = String(raw).replace(/\/+$/, "")
+  } else if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin
     if (origin !== "http://localhost:3000" && origin !== "http://127.0.0.1:3000")
-      return `${origin}/api`
+      base = `${origin}/api`
+    else
+      base = "http://localhost:8000"
+  } else {
+    base = "http://localhost:8000"
   }
-  return "http://localhost:8000"
+  // If env was set to origin without /api (e.g. https://resonaai.duckdns.org), nginx expects /api prefix
+  if (typeof window !== "undefined" && window.location?.origin && base === window.location.origin)
+    return `${base}/api`
+  return base
 }
 
 let cached: SupabaseClient | null = null

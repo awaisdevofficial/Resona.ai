@@ -3,16 +3,23 @@ import { getSupabase } from "./supabaseClient"
 function getApiBaseUrl(): string {
   const raw =
     typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
+  let base: string
   if (raw && String(raw).trim()) {
-    return String(raw).replace(/\/+$/, "")
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
+    base = String(raw).replace(/\/+$/, "")
+  } else if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin
     if (origin !== "http://localhost:3000" && origin !== "http://127.0.0.1:3000") {
-      return `${origin}/api`
+      base = `${origin}/api`
+    } else {
+      base = "http://localhost:8000"
     }
+  } else {
+    base = "http://localhost:8000"
   }
-  return "http://localhost:8000"
+  // If env was set to origin without /api, nginx expects /api prefix for backend
+  if (typeof window !== "undefined" && window.location?.origin && base === window.location.origin)
+    return `${base}/api`
+  return base
 }
 /** Base URL of the backend API (no trailing slash). Set NEXT_PUBLIC_API_URL in .env. */
 export const API_BASE_URL = getApiBaseUrl()
