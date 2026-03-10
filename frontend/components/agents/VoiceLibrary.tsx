@@ -359,20 +359,34 @@ export function VoiceLibrary({
                     <p className="text-xs text-white/70">
                       Upload 1+ audio samples (MP3/WAV, a few seconds of clear speech). The new voice will appear in the library.
                     </p>
-                    <input
-                      type="text"
-                      value={cloneName}
-                      onChange={(e) => setCloneName(e.target.value)}
-                      placeholder="Voice name"
-                      className="form-input w-full max-w-xs"
-                    />
+                    <div>
+                      <input
+                        type="text"
+                        value={cloneName}
+                        onChange={(e) => setCloneName(e.target.value)}
+                        placeholder="e.g. My Voice"
+                        className="form-input w-full max-w-xs"
+                        aria-label="Voice name (required)"
+                      />
+                      <p className="text-[11px] text-white/50 mt-1">Required — enter a name for your cloned voice.</p>
+                    </div>
                     <input
                       type="file"
                       accept="audio/*"
                       multiple
-                      onChange={(e) => setCloneFiles(e.target.files)}
+                      onChange={(e) => {
+                        const files = e.target.files
+                        setCloneFiles(files)
+                        if (files?.length && !cloneName.trim()) {
+                          const first = files[0].name.replace(/\.[^.]+$/, "")
+                          if (first) setCloneName(first)
+                        }
+                      }}
                       className="block text-xs text-white/70 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-[#4DFFCE]/20 file:text-[#4DFFCE]"
                     />
+                    {(!cloneName.trim() || !cloneFiles?.length) && !cloneSubmitting && (
+                      <p className="text-[11px] text-white/50">Enter a voice name and choose at least one audio file to enable Create clone.</p>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         variant="primary"
