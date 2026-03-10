@@ -18,6 +18,16 @@ from app.schemas.phone_number import PhoneNumberAssign, PhoneNumberResponse
 router = APIRouter()
 
 
+def _get_origination_uri() -> Optional[str]:
+    """Twilio origination URI (e.g. LiveKit SIP) for linking imported/purchased numbers."""
+    uri = (settings.LIVEKIT_SIP_URI or "").strip()
+    if uri:
+        return uri
+    if settings.LIVEKIT_API_KEY and settings.PUBLIC_HOST:
+        return f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}:5060"
+    return None
+
+
 def get_user_twilio(user: User) -> TwilioClient:
     """Get Twilio client using the USER's own credentials."""
     if not user.twilio_account_sid or not user.twilio_auth_token:
@@ -89,6 +99,7 @@ async def purchase_number(
     record = PhoneNumber(
         id=uuid.uuid4(),
         user_id=user.id,
+        origination_uri=_get_origination_uri(),
         number=incoming.phone_number,
         twilio_sid=incoming.sid,
         friendly_name=incoming.friendly_name,
@@ -145,9 +156,9 @@ async def import_numbers_from_twilio(
     # Fetch all numbers from user's Twilio account
     twilio_numbers = client.incoming_phone_numbers.list()
 
+    origination_uri = _get_origination_uri()
     imported = []
     for twilio_num in twilio_numbers:
-        # Check if already imported
         result = await db.execute(
             select(PhoneNumber).where(PhoneNumber.twilio_sid == twilio_num.sid)
         )
@@ -157,6 +168,7 @@ async def import_numbers_from_twilio(
             record = PhoneNumber(
                 id=uuid.uuid4(),
                 user_id=user.id,
+                origination_uri=origination_uri,
                 number=twilio_num.phone_number,
                 twilio_sid=twilio_num.sid,
                 friendly_name=twilio_num.friendly_name,

@@ -26,6 +26,7 @@ class PhoneNumberResponse(BaseModel):
     agent_id: Optional[UUID]
     number: str
     friendly_name: Optional[str]
+    origination_uri: Optional[str] = None
     termination_uri: Optional[str]
     capabilities: dict
     is_active: bool

@@ -1,8 +1,6 @@
 """
-App-wide defaults. TTS = Piper, STT = Whisper.cpp (self-hosted only).
+App-wide defaults. TTS + STT = ElevenLabs.
 """
 
-DEFAULT_PIPER_VOICE = "en_US-amy-medium"
-DEFAULT_PIPER_MODEL = "tts-1"
-DEFAULT_WHISPER_MODEL = "whisper-1"
-DEFAULT_WHISPER_LANGUAGE = "en"
+# ElevenLabs default voice ID (Rachel). Used when agent has no tts_voice_id.
+DEFAULT_ELEVENLABS_VOICE_ID = "bIHbv24MWmeRgasZH58o"

@@ -54,7 +54,7 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
     },
     onError: () =>
       toast.error(
-        "Failed to import. Connect Twilio in Settings first."
+        "Failed to import. Connect phone account in Settings first."
       ),
   });
 
@@ -183,14 +183,14 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                 ) : hasNoNumbers ? (
                   <>
                     <p className="text-sm text-white/70">
-                      Connect your Twilio account and phone number in Settings to
+                      Connect your phone account and number in Settings to
                       make and receive calls. Resona will set up everything
                       automatically.
                     </p>
                     <div className="flex flex-col gap-2 pt-4">
                       <Link href="/settings" onClick={onClose}>
                         <Button variant="primary" className="w-full">
-                          Connect Twilio in Settings
+                          Connect in Settings
                         </Button>
                       </Link>
                       <Button variant="ghost" onClick={onClose}>

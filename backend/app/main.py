@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
+from app.system_settings import load_cache_from_db
 from app.routers import (
     agents,
     api_keys,
@@ -24,6 +25,7 @@ from app.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     await init_db()
+    await load_cache_from_db()
     yield
 
 

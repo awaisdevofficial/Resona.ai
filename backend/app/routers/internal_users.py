@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import DEFAULT_PIPER_VOICE
+from app.constants import DEFAULT_ELEVENLABS_VOICE_ID
 from app.database import get_db
 from app.middleware.auth import verify_internal_secret
 from app.models.agent import Agent
@@ -69,13 +69,13 @@ async def get_default_agent_config(
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
-    tts_voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_PIPER_VOICE
+    tts_voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_ELEVENLABS_VOICE_ID
     return {
         "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "stt_provider": "whisper",
+        "stt_provider": "elevenlabs",
         "stt_language": agent.stt_language or "en-US",
-        "tts_provider": "piper",
+        "tts_provider": "elevenlabs",
         "tts_voice_id": tts_voice_id,
         "knowledge_base": knowledge_base,
         "agent_speaks_first": True,

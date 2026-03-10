@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.twiml.voice_response import Dial, VoiceResponse
 
 from app.config import settings
-from app.constants import DEFAULT_PIPER_VOICE
+from app.constants import DEFAULT_ELEVENLABS_VOICE_ID
 from app.database import get_db
 from app.prompts import get_full_system_prompt
 from app.models.agent import Agent
@@ -69,13 +69,13 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
-    tts_voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_PIPER_VOICE
+    tts_voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_ELEVENLABS_VOICE_ID
     metadata = json.dumps({
         "system_prompt": full_system_prompt,
         "first_message": agent.first_message or "Hi, how can I help you today?",
-        "stt_provider": "whisper",
+        "stt_provider": "elevenlabs",
         "stt_language": agent.stt_language or "en-US",
-        "tts_provider": "piper",
+        "tts_provider": "elevenlabs",
         "tts_voice_id": tts_voice_id,
         "silence_timeout": int(agent.silence_timeout or 30),
         "max_duration": int(agent.max_duration or 3600),

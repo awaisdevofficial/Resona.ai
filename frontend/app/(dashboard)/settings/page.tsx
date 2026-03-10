@@ -94,7 +94,7 @@ function IntegrationsTab() {
         twilio_phone_number: phoneNumber.trim(),
       }),
     onSuccess: () => {
-      toast.success("Twilio connected. Your number is ready for calls.")
+      toast.success("Phone account connected. Your number is ready for calls.")
       setShowForm(false)
       setAccountSid("")
       setAuthToken("")
@@ -106,7 +106,7 @@ function IntegrationsTab() {
       const msg =
         typeof err?.message === "string"
           ? err.message
-          : "Failed to connect. Check your Twilio credentials and number."
+          : "Failed to connect. Check your credentials and number."
       toast.error(msg)
     },
   })
@@ -114,7 +114,7 @@ function IntegrationsTab() {
   const disconnect = useMutation({
     mutationFn: () => api.delete("/v1/telephony/disconnect"),
     onSuccess: () => {
-      toast.success("Twilio disconnected")
+      toast.success("Phone account disconnected")
       qc.invalidateQueries({ queryKey: ["telephony-status"] })
       qc.invalidateQueries({ queryKey: ["phone-numbers"] })
     },
@@ -127,7 +127,7 @@ function IntegrationsTab() {
       toast.success(`Imported ${data?.imported ?? 0} number(s). Assign an agent below.`)
       qc.invalidateQueries({ queryKey: ["phone-numbers"] })
     },
-    onError: () => toast.error("Failed to import. Connect Twilio above first."),
+    onError: () => toast.error("Failed to import. Connect phone account above first."),
   })
 
   const assignTelephonyAgent = useMutation({
@@ -165,16 +165,16 @@ function IntegrationsTab() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Twilio connect card */}
+      {/* Phone / telephony connect card */}
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               <Phone size={18} />
-              Twilio & Phone
+              Phone & Numbers
             </h3>
             <p className="text-sm text-white/70 mt-0.5">
-              Connect one Twilio account. Resona sets up the SIP trunk and routing. Add more numbers below and assign an agent to each.
+              Connect your phone account. Resona sets up routing. Add more numbers below and assign an agent to each.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ function IntegrationsTab() {
               onClick={() => setShowForm(true)}
               className="btn-primary"
             >
-              {status?.is_connected ? "Reconnect (replace)" : "Connect Twilio"}
+              {status?.is_connected ? "Reconnect (replace)" : "Connect"}
             </button>
             {status?.is_connected && (
               <button
@@ -234,7 +234,7 @@ function IntegrationsTab() {
                   type={showToken ? "text" : "password"}
                   value={authToken}
                   onChange={(e) => setAuthToken(e.target.value)}
-                  placeholder="Your Twilio auth token"
+                  placeholder="Your auth token"
                   className="w-full px-3 py-2 pr-10 border border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30 bg-white/5"
                 />
                 <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white">
@@ -251,7 +251,7 @@ function IntegrationsTab() {
                 placeholder="+12025551234"
                 className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-[#4DFFCE]/50 focus:ring-1 focus:ring-[#4DFFCE]/30 bg-white/5"
               />
-              <p className="text-xs text-white/70 mt-1">Primary number for this account. Must be in your Twilio account.</p>
+              <p className="text-xs text-white/70 mt-1">Primary number for this account.</p>
             </div>
             <div className="flex gap-2">
               <button
@@ -300,7 +300,7 @@ function IntegrationsTab() {
 
           {allRows.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 bg-white/5/30 py-8 px-4 text-center">
-              <p className="text-sm text-white/70">No numbers yet. Connect Twilio above, then use &quot;Import more numbers&quot; to sync from your Twilio account.</p>
+              <p className="text-sm text-white/70">No numbers yet. Connect above, then use &quot;Import more numbers&quot; to sync your numbers.</p>
               <button
                 type="button"
                 onClick={() => importNumbers.mutate()}

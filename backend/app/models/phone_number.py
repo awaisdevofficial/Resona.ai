@@ -15,6 +15,8 @@ class PhoneNumber(Base):
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
     number = Column(String, unique=True, nullable=False)  # E.164
     twilio_sid = Column(String, unique=True, nullable=True)
+    # Twilio origination URI (SIP URI used for outbound/origination)
+    origination_uri = Column(String, nullable=True)
     # Optional termination URI where your carrier forwards calls
     termination_uri = Column(String, nullable=True)
     friendly_name = Column(String, nullable=True)

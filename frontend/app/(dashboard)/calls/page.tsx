@@ -74,7 +74,7 @@ export default function CallsPage() {
     },
     onError: () =>
       toast.error(
-        "Failed to import. Add your Twilio credentials in Settings first."
+        "Failed to import. Add your phone credentials in Settings first."
       ),
   });
 
@@ -144,11 +144,11 @@ export default function CallsPage() {
         <div className="glass-panel-sm p-4 mb-6 border-l-2 border-l-amber-500/50 text-sm text-amber-400">
           <p className="font-medium mb-1">Connect your phone number</p>
           <p className="text-white/60">
-            To make and receive calls, connect your Twilio account and number in{" "}
+            To make and receive calls, connect your phone account and number in{" "}
             <Link href="/settings" className="underline font-medium text-[#4DFFCE] hover:no-underline">
-              Settings → Integrations
+              Settings
             </Link>
-            . Resona will set up the SIP trunk and routing automatically.
+            . Resona will set up routing automatically.
           </p>
         </div>
       )}
@@ -367,7 +367,7 @@ export default function CallsPage() {
                 <div className="space-y-4">
                   <p className="text-sm text-white/70">
                     Import your own number first to make and receive calls.
-                    Add Twilio credentials in Settings, then import your numbers.
+                    Add phone credentials in Settings, then import your numbers.
                   </p>
                   <div className="flex flex-col gap-2">
                     <button
@@ -376,7 +376,7 @@ export default function CallsPage() {
                       onClick={() => importNumbers.mutate()}
                       disabled={importNumbers.isPending}
                     >
-                      {importNumbers.isPending ? "Importing…" : "Import from Twilio"}
+                      {importNumbers.isPending ? "Importing…" : "Import numbers"}
                     </button>
                     <Link href="/settings" onClick={() => setOutboundModal(false)}>
                       <button type="button" className="btn-secondary w-full">

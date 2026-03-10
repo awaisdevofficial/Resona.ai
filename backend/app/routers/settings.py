@@ -230,12 +230,17 @@ async def configure_sip(
     )
     existing_record = existing.scalar_one_or_none()
     if existing_record is None:
+        origination_uri = (settings.LIVEKIT_SIP_URI or "").strip() or (
+            f"sip:{settings.LIVEKIT_API_KEY}@{settings.PUBLIC_HOST}:5060"
+            if (settings.LIVEKIT_API_KEY and settings.PUBLIC_HOST) else None
+        )
         phone_record = PhoneNumber(
             id=uuid.uuid4(),
             user_id=user.id,
             number=body.phone_number.strip(),
             twilio_sid=None,
             friendly_name=body.phone_number.strip(),
+            origination_uri=origination_uri,
             is_active=True,
         )
         db.add(phone_record)

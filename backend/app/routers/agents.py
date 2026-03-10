@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from app.config import settings
-from app.constants import DEFAULT_PIPER_VOICE
+from app.constants import DEFAULT_ELEVENLABS_VOICE_ID
 import httpx as _httpx
 
 from app.database import get_db
@@ -183,7 +183,7 @@ async def _create_web_call_token_impl(
     room_name = f"webcall-{uuid.uuid4()}"
     call_id = uuid.uuid4()
 
-    voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_PIPER_VOICE
+    voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_ELEVENLABS_VOICE_ID
 
     full_system_prompt = get_full_system_prompt(agent.system_prompt)
     max_kb = getattr(settings, "MAX_KNOWLEDGE_BASE_LEN_FOR_TOKEN", 8000)
@@ -204,13 +204,13 @@ async def _create_web_call_token_impl(
         "user_id": str(user.id),
         "user_email": user.email,
         "system_prompt": full_system_prompt,
-        "first_message": (agent.first_message or "")[:500],
+        "first_message": (agent.first_message or "")[:2000],
         "llm_model": agent.llm_model or "gpt-4o-mini",
         "llm_temperature": agent.llm_temperature or 0.7,
         "llm_max_tokens": agent.llm_max_tokens or 500,
-        "stt_provider": "whisper",
+        "stt_provider": "elevenlabs",
         "stt_language": agent.stt_language or "en-US",
-        "tts_provider": "piper",
+        "tts_provider": "elevenlabs",
         "tts_voice_id": voice_id,
         "tts_stability": agent.tts_stability or 0.5,
         "silence_timeout": int(agent.silence_timeout or 30),

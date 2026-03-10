@@ -501,7 +501,7 @@ export function TestCallPanel({
           )}
 
           <p className="text-label text-white/70 text-center mt-3 break-words px-1">
-            This is a browser-based test call. No phone or Twilio is used.
+            This is a browser-based test call. No phone line is used.
           </p>
         </div>
       </div>

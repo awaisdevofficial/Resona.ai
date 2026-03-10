@@ -73,7 +73,7 @@ export default function DocumentationPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#4DFFCE] mt-0.5">•</span>
-              <span><strong className="text-white">Calls</strong> — Inbound (Twilio) and outbound calls, plus browser-based test calls. Transcripts and metadata are stored.</span>
+              <span><strong className="text-white">Calls</strong> — Inbound and outbound calls, plus browser-based test calls. Transcripts and metadata are stored.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#4DFFCE] mt-0.5">•</span>

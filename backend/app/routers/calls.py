@@ -12,7 +12,8 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.constants import DEFAULT_PIPER_VOICE
+from app.system_settings import get_openai_keys_ordered
+from app.constants import DEFAULT_ELEVENLABS_VOICE_ID
 from app.database import AsyncSessionLocal, get_db
 from app.prompts import get_full_system_prompt
 from app.middleware.auth import get_current_user, verify_internal_secret
@@ -40,8 +41,9 @@ internal_router = APIRouter()
 async def analyze_call(transcript_lines: list, call_id: str) -> None:
     if not transcript_lines:
         return
-    if not settings.GROQ_API_KEY:
-        logger.warning("GROQ_API_KEY not set; skipping post-call analysis")
+    keys = get_openai_keys_ordered()
+    if not keys:
+        logger.warning("No OPENAI_API_KEY in api-keys table; skipping post-call analysis")
         return
     transcript_text = "\n".join(
         [
@@ -49,16 +51,18 @@ async def analyze_call(transcript_lines: list, call_id: str) -> None:
             for line in transcript_lines
         ]
     )
-    try:
-        from groq import AsyncGroq
+    from openai import AsyncOpenAI
 
-        client = AsyncGroq(api_key=settings.GROQ_API_KEY)
-        response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Analyze this call transcript and respond ONLY with valid JSON:
+    last_err: Exception | None = None
+    for api_key in keys:
+        try:
+            client = AsyncOpenAI(api_key=api_key)
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""Analyze this call transcript and respond ONLY with valid JSON:
 {{
   "summary": "2-3 sentence summary of the call",
   "sentiment": "positive" | "neutral" | "negative",
@@ -69,20 +73,24 @@ async def analyze_call(transcript_lines: list, call_id: str) -> None:
 
 Transcript:
 {transcript_text}""",
-                }
-            ],
-            max_tokens=500,
-        )
-        raw = response.choices[0].message.content
-        analysis = json.loads(raw)
-        async with AsyncSessionLocal() as db:
-            call = await db.get(Call, uuid.UUID(call_id))
-            if call:
-                call.summary = analysis.get("summary", "")
-                call.analysis = analysis
-                await db.commit()
-    except Exception as e:
-        logger.warning("Post-call analysis failed: %s", e)
+                    }
+                ],
+                max_tokens=500,
+            )
+            raw = response.choices[0].message.content
+            analysis = json.loads(raw)
+            async with AsyncSessionLocal() as db:
+                call = await db.get(Call, uuid.UUID(call_id))
+                if call:
+                    call.summary = analysis.get("summary", "")
+                    call.analysis = analysis
+                    await db.commit()
+            return
+        except Exception as e:
+            last_err = e
+            logger.debug("OpenAI analysis failed with key, trying next row: %s", e)
+    if last_err:
+        logger.warning("Post-call analysis failed for all keys: %s", last_err)
 
 
 async def trigger_webhooks(
@@ -172,7 +180,7 @@ async def make_outbound_call(
     kb_entries = kb_result.scalars().all()
     knowledge_base = "\n\n".join([f"[{e.name}]\n{e.content}" for e in kb_entries])
 
-    voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_PIPER_VOICE
+    voice_id = (agent.tts_voice_id or "").strip() or DEFAULT_ELEVENLABS_VOICE_ID
 
     # Create room with metadata
     room_name = f"sip-{user.id}-{uuid.uuid4()}"
@@ -184,10 +192,10 @@ async def make_outbound_call(
             "system_prompt": full_system_prompt,
             "first_message": agent.first_message
             or "Hi, how can I help you today?",
-            "stt_provider": "whisper",
+            "stt_provider": "elevenlabs",
             "stt_language": agent.stt_language or "en-US",
             "tts_voice_id": voice_id,
-            "tts_provider": "piper",
+            "tts_provider": "elevenlabs",
             "silence_timeout": int(agent.silence_timeout or 30),
             "max_duration": int(agent.max_duration or 3600),
             "call_id": str(call_id),

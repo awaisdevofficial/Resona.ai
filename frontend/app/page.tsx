@@ -66,7 +66,7 @@ export default function RootPage() {
             </h1>
             <p className="text-sm md:text-base text-white/60 leading-relaxed">
               Resona.ai lets you spin up production-ready voice agents in minutes.
-              Connect your Twilio numbers, configure agent behaviour, and review
+              Connect your phone numbers, configure agent behaviour, and review
               every conversation from a single, beautiful dashboard.
             </p>
             <div className="flex flex-wrap gap-3">

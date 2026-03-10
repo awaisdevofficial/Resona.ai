@@ -48,15 +48,11 @@ class Settings(BaseSettings):
     # SIP origination: IP where Twilio sends inbound SIP (e.g. 18.141.140.150)
     SIP_SERVER_IP: str = "127.0.0.1"
 
-    # AI: Groq (LLM); self-hosted Piper (TTS) and Whisper.cpp (STT) only
-    GROQ_API_KEY: str = ""
-    PIPER_TTS_URL: str = ""
-    PIPER_TTS_VOICE: str = "en_US-amy-medium"
-    PIPER_TTS_MODEL: str = "tts-1"
-    # Whisper.cpp OpenAI-compatible proxy (e.g. http://18.141.177.170:8002/v1/audio/transcriptions)
-    WHISPER_STT_URL: str = ""
-    WHISPER_STT_MODEL: str = "whisper-1"
-    WHISPER_STT_LANGUAGE: str = "en"
+    # AI: OpenAI (LLM); ElevenLabs STT + TTS. API keys from DB (system_settings).
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_DEFAULT_VOICE_ID: str = "bIHbv24MWmeRgasZH58o"  # Rachel (ElevenLabs default)
+    ELEVENLABS_STT_MODEL: str = "scribe_v2_realtime"
+    ELEVENLABS_TTS_MODEL: str = "eleven_turbo_v2_5"
 
     # Supabase
     SUPABASE_URL: str
@@ -83,10 +79,10 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str
 
-    # Agent prompt limits (keep JWT token URL safe; ~2k–8k URL limit in browsers)
-    MAX_SYSTEM_PROMPT_LEN: int = 8000
-    MAX_FIRST_MESSAGE_LEN: int = 500
-    MAX_KNOWLEDGE_BASE_LEN_FOR_TOKEN: int = 4000
+    # Agent prompt limits (room metadata is in request body, not URL; allow longer prompts)
+    MAX_SYSTEM_PROMPT_LEN: int = 32000
+    MAX_FIRST_MESSAGE_LEN: int = 2000
+    MAX_KNOWLEDGE_BASE_LEN_FOR_TOKEN: int = 16000
 
     @field_validator("API_BASE_URL", "FRONTEND_URL", mode="after")
     @classmethod

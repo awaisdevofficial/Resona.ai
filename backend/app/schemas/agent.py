@@ -16,8 +16,8 @@ SUPPORTED_LANGUAGES = {
 
 
 # Limits to keep LiveKit token (and request URL) size safe
-MAX_SYSTEM_PROMPT_LEN = 8000
-MAX_FIRST_MESSAGE_LEN = 500
+MAX_SYSTEM_PROMPT_LEN = 32000
+MAX_FIRST_MESSAGE_LEN = 2000
 
 
 class AgentCreate(BaseModel):
@@ -28,10 +28,10 @@ class AgentCreate(BaseModel):
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(0.7, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(500, ge=50, le=4000)
-    stt_provider: str = "whisper"
+    stt_provider: str = "elevenlabs"
     stt_model: str = "nova-2-general"
     stt_language: str = "en-US"
-    tts_provider: str = "piper"
+    tts_provider: str = "elevenlabs"
     tts_voice_id: Optional[str] = None
     tts_stability: float = Field(0.5, ge=0.0, le=1.0)
     silence_timeout: int = Field(30, ge=5, le=300)

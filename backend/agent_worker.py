@@ -1,10 +1,9 @@
-# Must be set before any livekit or openai imports (Whisper.cpp on CPU needs ~60s timeout)
 import os
 from pathlib import Path
 
 os.environ.setdefault("OPENAI_TIMEOUT", "60")
 
-# Load backend .env so PIPER_*, WHISPER_*, GROQ_*, etc. are found when worker runs from any cwd
+# Load backend .env so DATABASE_URL, etc. are found when worker runs from any cwd
 _backend_dir = Path(__file__).resolve().parent
 from dotenv import load_dotenv
 _load_env = _backend_dir / ".env"
@@ -17,6 +16,10 @@ if os.environ.get("ENV") == "production":
     _prod_env = _backend_dir / ".env.production"
     if _prod_env.exists():
         load_dotenv(_prod_env)
+
+# Load API keys from DB (system_settings) into env so config sees them
+from app.system_settings import run_load_system_settings_into_env
+run_load_system_settings_into_env()
 
 import asyncio
 import json
@@ -39,7 +42,7 @@ from livekit.agents.llm import FallbackAdapter, function_tool
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
 from livekit.agents.voice import room_io as voice_room_io
-from livekit.plugins import silero, groq
+from livekit.plugins import silero
 
 logger = logging.getLogger("resona-agent")
 logging.basicConfig(level=logging.INFO)
@@ -67,9 +70,9 @@ async def entrypoint(ctx: JobContext):
     logger.info("Agent job started room=%s", ctx.room.name)
     # Log STT/TTS config (no secrets) so failures are easier to debug
     logger.info(
-        "STT URL: %s | TTS URL: %s",
-        (app_settings.WHISPER_STT_URL or "").strip() or "(not set)",
-        (app_settings.PIPER_TTS_URL or "").strip() or "(not set)",
+        "STT/TTS: ElevenLabs (model_stt=%s, model_tts=%s)",
+        app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime",
+        app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5",
     )
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -109,8 +112,8 @@ async def entrypoint(ctx: JobContext):
             agent_config = {
                 "system_prompt": "You are a helpful voice AI assistant.",
                 "first_message": "Hi, how can I help?",
-                "tts_provider": "piper",
-                "tts_voice_id": "en_US-amy-medium",
+                "tts_provider": "elevenlabs",
+                "tts_voice_id": app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o",
             }
 
     base_system_prompt = agent_config.get(
@@ -145,94 +148,45 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.warning(f"Failed to send transcript: {e}")
 
-    # STT — Whisper.cpp only (openai-compatible). Use explicit client with 60s timeout for CPU Whisper.
+    # STT — ElevenLabs Scribe
+    elevenlabs_key = (app_settings.ELEVENLABS_API_KEY or "").strip()
+    if not elevenlabs_key:
+        raise RuntimeError("ELEVENLABS_API_KEY is not configured. Cannot start agent worker.")
+
+    from livekit.plugins import elevenlabs as elevenlabs_plugin
+
+    stt = elevenlabs_plugin.STT(
+        api_key=elevenlabs_key,
+        model_id=app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime",
+        language_code=(stt_language or "en").split("-")[0],
+    )
+    logger.info("STT: ElevenLabs (%s)", app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime")
+
+    # LLM — OpenAI only
     from livekit.plugins import openai as openai_plugin
-    from openai import AsyncClient as OpenAIAsyncClient
 
-    whisper_url = (app_settings.WHISPER_STT_URL or "").strip()
-    if not whisper_url:
-        raise RuntimeError("WHISPER_STT_URL is not configured. Cannot start agent worker.")
+    openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if not openai_key:
+        raise RuntimeError("OPENAI_API_KEY is required for the LLM. Set it in DB (system_settings) or environment.")
 
-    # OpenAI client expects base_url to end with /v1 (it appends /audio/transcriptions)
-    whisper_base = whisper_url.replace("/v1/audio/transcriptions", "").rstrip("/")
-    if not whisper_base.endswith("/v1"):
-        whisper_base = whisper_base + "/v1"
-    _http_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(60.0),
-        follow_redirects=True,
+    llm = openai_plugin.LLM(
+        model="gpt-4o-mini",
+        api_key=openai_key,
     )
-    _openai_client = OpenAIAsyncClient(
-        api_key="sk-self-hosted",
-        base_url=whisper_base,
-        http_client=_http_client,
+    logger.info("LLM: OpenAI (gpt-4o-mini)")
+
+    # TTS — ElevenLabs (fallback to default if stored ID looks like legacy Piper e.g. en_US-amy-medium)
+    raw_voice = (agent_config.get("tts_voice_id") or "").strip()
+    default_voice = (app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o").strip()
+    # Piper-style IDs contain locale underscore (en_US-...); ElevenLabs IDs are alphanumeric/hyphen only, no underscore
+    tts_voice_id = default_voice if (not raw_voice or "_" in raw_voice) else raw_voice
+
+    tts = elevenlabs_plugin.TTS(
+        api_key=elevenlabs_key,
+        voice_id=tts_voice_id,
+        model=app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5",
     )
-    try:
-        stt = openai_plugin.STT(
-            client=_openai_client,
-            model="whisper-1",
-            language=(stt_language or "en").split("-")[0],
-        )
-    except TypeError as e:
-        if "http_session" in str(e):
-            # Older livekit-agents may pass http_session; plugin may not accept it. Create with minimal args.
-            stt = openai_plugin.STT(
-                base_url=whisper_base,
-                api_key="sk-self-hosted",
-                model="whisper-1",
-                language=(stt_language or "en").split("-")[0],
-            )
-            if hasattr(stt, "_client") and hasattr(stt._client, "_client"):
-                stt._client._client.timeout = httpx.Timeout(60.0)
-            elif hasattr(stt, "_client") and hasattr(stt._client, "http_client"):
-                stt._client.http_client.timeout = httpx.Timeout(60.0)
-        else:
-            raise
-    logger.info("STT: self-hosted Whisper.cpp at %s", whisper_url)
-
-    # LLM
-    groq_key = (os.environ.get("GROQ_API_KEY") or "").strip()
-    if not groq_key:
-        raise RuntimeError("GROQ_API_KEY is required for the LLM. Set it in the environment.")
-
-    primary_llm = groq.LLM(
-        model="llama-3.3-70b-versatile",
-        api_key=groq_key,
-    )
-    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if openai_key:
-        fallback_llm = openai_plugin.LLM(
-            model="gpt-4o-mini",
-            api_key=openai_key,
-        )
-        llm = FallbackAdapter(
-            llm=[primary_llm, fallback_llm],
-            attempt_timeout=15.0,
-            max_retry_per_llm=0,
-        )
-        logger.info("LLM: Groq primary with OpenAI fallback (gpt-4o-mini)")
-    else:
-        llm = primary_llm
-        logger.info("LLM: Groq only (set OPENAI_API_KEY for fallback)")
-
-    # TTS — Piper only
-    piper_tts_url = (app_settings.PIPER_TTS_URL or "").strip()
-    if not piper_tts_url:
-        raise RuntimeError("PIPER_TTS_URL is not configured. Cannot start agent worker.")
-
-    piper_base = piper_tts_url.replace("/v1/audio/speech", "").replace("/audio/speech", "").rstrip("/")
-    if not piper_base.endswith("/v1"):
-        piper_base = piper_base + "/v1"
-
-    piper_voice = (agent_config.get("tts_voice_id") or "").strip() or (app_settings.PIPER_TTS_VOICE or "en_US-amy-medium").strip()
-
-    tts = openai_plugin.TTS(
-        base_url=piper_base,
-        api_key="sk-self-hosted",
-        model=app_settings.PIPER_TTS_MODEL or "tts-1",
-        voice=piper_voice,
-        response_format="wav",
-    )
-    logger.info("TTS: self-hosted Piper at %s (voice=%s)", piper_tts_url, piper_voice)
+    logger.info("TTS: ElevenLabs (voice=%s)", tts_voice_id)
 
     # AgentSession — use TurnHandlingConfig if available, else standard kwargs
     _session_kw: dict = {
@@ -317,25 +271,30 @@ async def entrypoint(ctx: JobContext):
             )
         )
 
-    def make_transfer_tool(room):
+    transfer_number = (agent_config.get("transfer_number") or "").strip()
+
+    def make_transfer_tool(room, configured_transfer_number: str):
         @function_tool
         async def transfer_call(transfer_to: str) -> str:
             """Transfer the current call to a human agent or another number.
             Use this when the user asks to speak to a human, or when you cannot help them.
             transfer_to: the phone number or department to transfer to.
             """
+            if not configured_transfer_number:
+                return "Transfer is currently unavailable."
             try:
-                payload = json.dumps({"type": "transfer", "to": transfer_to})
+                payload = json.dumps({"type": "transfer", "to": configured_transfer_number})
                 await room.local_participant.publish_data(
                     payload.encode(), reliable=True
                 )
             except Exception as e:
                 logger.warning(f"Failed to publish transfer: {e}")
+                return "Transfer is currently unavailable."
             return "Transferring you now. Please hold."
 
         return transfer_call
 
-    transfer_tool = make_transfer_tool(ctx.room)
+    transfer_tool = make_transfer_tool(ctx.room, transfer_number)
     logger.info(
         "Starting voice session room=%s agent_speaks_first=%s",
         ctx.room.name,

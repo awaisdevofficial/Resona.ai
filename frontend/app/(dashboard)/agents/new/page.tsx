@@ -19,10 +19,10 @@ const FIXED_DEFAULTS = {
   llm_model: "gpt-4o-mini",
   llm_temperature: 0.7,
   llm_max_tokens: 500,
-  stt_provider: "whisper",
-  stt_model: "whisper-1",
+  stt_provider: "elevenlabs",
+  stt_model: "scribe_v2_realtime",
   stt_language: "en-US",
-  tts_provider: "piper",
+  tts_provider: "elevenlabs",
   tts_stability: 0.5,
 }
 
@@ -83,7 +83,7 @@ export default function NewAgentPage() {
         "You are a helpful, friendly voice AI agent that assists callers with their questions.",
       first_message: "Hi, this is your AI assistant. How can I help you today?",
       tts_voice_id: "en_US-amy-medium",
-      tts_provider: "piper",
+      tts_provider: "elevenlabs",
       stt_language: "en-US",
       silence_timeout: 30,
       max_duration: 3600,
@@ -128,7 +128,7 @@ export default function NewAgentPage() {
       api.post("/v1/agents", {
         ...FIXED_DEFAULTS,
         ...values,
-        tts_provider: values.tts_provider || FIXED_DEFAULTS.tts_provider,
+        tts_provider: values.tts_provider ?? FIXED_DEFAULTS.tts_provider,
         tools_config: { agent_speaks_first: values.agent_speaks_first },
       }),
     onSuccess: (agent: any) => {
@@ -158,7 +158,7 @@ export default function NewAgentPage() {
         },
         body: JSON.stringify({
           voice_id: form.getValues("tts_voice_id"),
-          provider: form.getValues("tts_provider") || "piper",
+          provider: form.getValues("tts_provider") ?? "elevenlabs",
           text:
             "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
@@ -356,10 +356,10 @@ export default function NewAgentPage() {
                         Speaking voice
                       </p>
                       <p className="text-sm text-white truncate">
-                        {displayVoiceName || "Piper default voice"}
+                        {displayVoiceName || "Default voice"}
                       </p>
                       <p className="text-[11px] text-white/70">
-                        Provider: {(watchedProvider || "piper").toUpperCase()}
+                        Voice
                       </p>
                     </div>
                   </div>
@@ -386,7 +386,7 @@ export default function NewAgentPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-white/70">
-                    Browse voices (Piper self-hosted). Choose a voice before saving your agent.
+                    Browse voice library. Choose a voice before saving your agent.
                   </p>
                   {form.formState.errors.tts_voice_id && (
                     <p className="text-[11px] text-red-400">
@@ -568,10 +568,10 @@ export default function NewAgentPage() {
         open={voiceLibraryOpen}
         onClose={() => setVoiceLibraryOpen(false)}
         selectedVoiceId={watchedVoice}
-        selectedProvider={watchedProvider || "piper"}
+        selectedProvider={watchedProvider ?? "elevenlabs"}
         onSelect={(voice: Voice) => {
           form.setValue("tts_voice_id", voice.id)
-          form.setValue("tts_provider", voice.provider || "piper")
+          form.setValue("tts_provider", voice.provider ?? "elevenlabs")
         }}
       />
     </div>

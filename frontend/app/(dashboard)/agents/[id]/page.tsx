@@ -19,10 +19,10 @@ const FIXED_DEFAULTS = {
   llm_model: "gpt-4o-mini",
   llm_temperature: 0.7,
   llm_max_tokens: 500,
-  stt_provider: "whisper",
-  stt_model: "whisper-1",
+  stt_provider: "elevenlabs",
+  stt_model: "scribe_v2_realtime",
   stt_language: "en-US",
-  tts_provider: "piper",
+  tts_provider: "elevenlabs",
   tts_stability: 0.5,
 }
 
@@ -93,7 +93,7 @@ export default function AgentEditPage({
       system_prompt: "",
       first_message: "",
       tts_voice_id: "",
-      tts_provider: "piper",
+      tts_provider: "elevenlabs",
       stt_language: "en-US",
       silence_timeout: 30,
       max_duration: 3600,
@@ -110,7 +110,7 @@ export default function AgentEditPage({
         system_prompt: agent.system_prompt || "",
         first_message: agent.first_message || "",
         tts_voice_id: agent.tts_voice_id || "",
-        tts_provider: agent.tts_provider || "piper",
+        tts_provider: agent.tts_provider ?? "elevenlabs",
         stt_language: agent.stt_language || "en-US",
         silence_timeout: agent.silence_timeout || 30,
         max_duration: agent.max_duration || 3600,
@@ -161,7 +161,7 @@ export default function AgentEditPage({
         system_prompt: updatedAgent.system_prompt || "",
         first_message: updatedAgent.first_message || "",
         tts_voice_id: updatedAgent.tts_voice_id || "",
-        tts_provider: updatedAgent.tts_provider || "piper",
+        tts_provider: updatedAgent.tts_provider ?? "elevenlabs",
         silence_timeout: updatedAgent.silence_timeout || 30,
         max_duration: updatedAgent.max_duration || 3600,
         agent_speaks_first:
@@ -190,7 +190,7 @@ export default function AgentEditPage({
         },
         body: JSON.stringify({
           voice_id: form.getValues("tts_voice_id") || agent.tts_voice_id,
-          provider: form.getValues("tts_provider") || agent?.tts_provider || "piper",
+          provider: form.getValues("tts_provider") ?? agent?.tts_provider ?? "elevenlabs",
           text:
             "Hi, I am your AI voice assistant, ready to help you on every call.",
         }),
@@ -442,10 +442,10 @@ export default function AgentEditPage({
                           Speaking voice
                         </p>
                         <p className="text-sm text-white truncate">
-                          {displayVoiceName || "Piper default voice"}
+                          {displayVoiceName || "Default voice"}
                         </p>
                         <p className="text-[11px] text-white/70">
-                          Provider: {(watchedProvider || agent.tts_provider || "piper").toUpperCase()}
+                          Voice
                         </p>
                       </div>
                     </div>
@@ -472,7 +472,7 @@ export default function AgentEditPage({
                       </button>
                     </div>
                     <p className="text-[11px] text-white/70">
-                      Browse voices (Piper self-hosted).
+                      Browse voice library.
                     </p>
                     {form.formState.errors.tts_voice_id && (
                       <p className="text-[11px] text-red-400">
@@ -670,10 +670,10 @@ export default function AgentEditPage({
         open={voiceLibraryOpen}
         onClose={() => setVoiceLibraryOpen(false)}
         selectedVoiceId={watchedVoice || agent.tts_voice_id}
-        selectedProvider={watchedProvider || agent.tts_provider || "piper"}
+        selectedProvider={watchedProvider ?? agent?.tts_provider ?? "elevenlabs"}
         onSelect={(voice: Voice) => {
           form.setValue("tts_voice_id", voice.id)
-          form.setValue("tts_provider", voice.provider || "piper")
+          form.setValue("tts_provider", voice.provider ?? "elevenlabs")
         }}
       />
     </>

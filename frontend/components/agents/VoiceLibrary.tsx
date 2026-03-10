@@ -65,8 +65,9 @@ const LANG_FLAGS: Record<string, string> = {
 }
 
 const providerLabel: Record<string, string> = {
-  piper: "Piper TTS",
-  kokoro: "Piper TTS",
+  piper: "Voice",
+  kokoro: "Voice",
+  elevenlabs: "Voice",
 }
 
 type TabFilter = "all" | "english" | "other"
