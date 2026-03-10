@@ -114,6 +114,10 @@ async def entrypoint(ctx: JobContext):
                 "first_message": "Hey, hi! What can I do for you?",
                 "tts_provider": "elevenlabs",
                 "tts_voice_id": app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o",
+                "llm_model": "gpt-4o",
+                "llm_temperature": 0.8,
+                "llm_max_tokens": 300,
+                "tts_stability": getattr(app_settings, "ELEVENLABS_TTS_STABILITY", 0.45),
             }
 
     # User's system prompt is primary; we only wrap it with real-time + human-behavior instructions
@@ -166,31 +170,51 @@ async def entrypoint(ctx: JobContext):
     )
     logger.info("STT: ElevenLabs (%s)", app_settings.ELEVENLABS_STT_MODEL or "scribe_v2_realtime")
 
-    # LLM — OpenAI only
+    # LLM — OpenAI; use agent config for model/temperature/max_tokens (more human, real-time)
     from livekit.plugins import openai as openai_plugin
 
     openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not openai_key:
         raise RuntimeError("OPENAI_API_KEY is required for the LLM. Set it in DB (system_settings) or environment.")
 
-    llm = openai_plugin.LLM(
-        model="gpt-4o-mini",
-        api_key=openai_key,
-    )
-    logger.info("LLM: OpenAI (gpt-4o-mini)")
+    llm_model = (agent_config.get("llm_model") or "gpt-4o").strip()
+    llm_temperature = float(agent_config.get("llm_temperature", 0.8))
+    llm_max_tokens = int(agent_config.get("llm_max_tokens", 300))
+    # Clamp for real-time: shorter replies feel more natural; temp 0.7–0.9 for variety
+    llm_temperature = max(0.5, min(1.0, llm_temperature))
+    llm_max_tokens = max(100, min(800, llm_max_tokens))
 
-    # TTS — ElevenLabs (fallback to default if stored ID looks like legacy Piper e.g. en_US-amy-medium)
+    llm = openai_plugin.LLM(
+        model=llm_model,
+        api_key=openai_key,
+        temperature=llm_temperature,
+        max_completion_tokens=llm_max_tokens,
+    )
+    logger.info("LLM: OpenAI (%s, temp=%.2f, max_tokens=%d)", llm_model, llm_temperature, llm_max_tokens)
+
+    # TTS — ElevenLabs best-for-calling model + voice settings for natural, non-robotic sound
     raw_voice = (agent_config.get("tts_voice_id") or "").strip()
     default_voice = (app_settings.ELEVENLABS_DEFAULT_VOICE_ID or "bIHbv24MWmeRgasZH58o").strip()
     # Piper-style IDs contain locale underscore (en_US-...); ElevenLabs IDs are alphanumeric/hyphen only, no underscore
     tts_voice_id = default_voice if (not raw_voice or "_" in raw_voice) else raw_voice
+    tts_model = (agent_config.get("tts_model") or app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5").strip()
+    # Stability: lower = more expressive (less robotic); similarity_boost: higher = closer to voice character
+    tts_stability = float(agent_config.get("tts_stability", getattr(app_settings, "ELEVENLABS_TTS_STABILITY", 0.45)))
+    tts_similarity = float(getattr(app_settings, "ELEVENLABS_TTS_SIMILARITY_BOOST", 0.75))
+    tts_stability = max(0.0, min(1.0, tts_stability))
+    tts_similarity = max(0.0, min(1.0, tts_similarity))
+    voice_settings = elevenlabs_plugin.VoiceSettings(
+        stability=tts_stability,
+        similarity_boost=tts_similarity,
+    )
 
     tts = elevenlabs_plugin.TTS(
         api_key=elevenlabs_key,
         voice_id=tts_voice_id,
-        model=app_settings.ELEVENLABS_TTS_MODEL or "eleven_turbo_v2_5",
+        model=tts_model,
+        voice_settings=voice_settings,
     )
-    logger.info("TTS: ElevenLabs (voice=%s)", tts_voice_id)
+    logger.info("TTS: ElevenLabs (voice=%s, model=%s, stability=%.2f)", tts_voice_id, tts_model, tts_stability)
 
     # AgentSession — use TurnHandlingConfig if available, else standard kwargs
     _session_kw: dict = {

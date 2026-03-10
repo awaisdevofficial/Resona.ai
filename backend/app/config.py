@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str = ""
     ELEVENLABS_DEFAULT_VOICE_ID: str = "bIHbv24MWmeRgasZH58o"  # Rachel (ElevenLabs default)
     ELEVENLABS_STT_MODEL: str = "scribe_v2_realtime"
-    ELEVENLABS_TTS_MODEL: str = "eleven_turbo_v2_5"
+    ELEVENLABS_TTS_MODEL: str = "eleven_turbo_v2_5"  # Best for real-time; use eleven_multilingual_v2 for max quality
+    ELEVENLABS_TTS_STABILITY: float = 0.45  # Lower = more expressive, less robotic (0.3–0.5 for conversational)
+    ELEVENLABS_TTS_SIMILARITY_BOOST: float = 0.75  # Higher = closer to voice character, natural clarity
     # Optional self-hosted TTS/STT (Piper / Whisper) for /settings/tts
     PIPER_TTS_URL: str = ""
     PIPER_TTS_VOICE: str = ""

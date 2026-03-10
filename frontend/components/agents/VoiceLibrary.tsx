@@ -239,6 +239,8 @@ export function VoiceLibrary({
     }
   }
 
+  const modalZ = 9998
+  const backdropZ = 9997
   return (
     <AnimatePresence>
       {open && (
@@ -247,17 +249,19 @@ export function VoiceLibrary({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md"
+            style={{ zIndex: backdropZ }}
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4"
+            className="fixed inset-0 flex items-center justify-center pointer-events-none p-4"
+            style={{ zIndex: modalZ }}
           >
             <div
-              className="glass-card rounded-2xl w-full max-w-4xl pointer-events-auto flex flex-col max-h-[90vh] border border-white/10"
+              className="glass-card rounded-2xl w-full max-w-4xl pointer-events-auto flex flex-col max-h-[90vh] border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.5)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">

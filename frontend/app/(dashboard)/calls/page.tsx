@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -18,6 +17,7 @@ import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
 
 import { CallStatusBadge } from "@/components/calls/CallStatusBadge";
+import { Modal } from "@/components/shared/Modal";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { api } from "@/lib/api";
 import { cn } from "@/components/lib-utils";
@@ -336,32 +336,14 @@ export default function CallsPage() {
         onClose={() => setSelected(null)}
       />
 
-      <AnimatePresence>
-        {outboundModal && (
-          <>
-            <motion.div
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOutboundModal(false)}
-            />
-            <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="w-full max-w-sm glass-card p-5 pointer-events-auto"
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-              <h3 className="text-lg font-semibold text-white mb-4">
-                New outbound call
-              </h3>
+      <Modal
+        open={outboundModal}
+        onClose={() => setOutboundModal(false)}
+        title="New outbound call"
+        subtitle="Select an agent and enter the number to call"
+        size="md"
+      >
+              <div className="space-y-4 -mt-2">
 
               {!phoneNumbers?.length ? (
                 <div className="space-y-4">
@@ -486,11 +468,8 @@ export default function CallsPage() {
                   </div>
                 </>
               )}
-              </motion.div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </div>
+      </Modal>
     </div>
   );
 }

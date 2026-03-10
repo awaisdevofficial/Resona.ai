@@ -77,7 +77,12 @@ async def get_default_agent_config(
         "stt_language": agent.stt_language or "en-US",
         "tts_provider": "elevenlabs",
         "tts_voice_id": tts_voice_id,
+        "tts_stability": agent.tts_stability if agent.tts_stability is not None else 0.45,
+        "llm_model": agent.llm_model or "gpt-4o",
+        "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
+        "llm_max_tokens": agent.llm_max_tokens or 300,
         "knowledge_base": knowledge_base,
         "agent_speaks_first": True,
+        "transfer_number": (agent.tools_config or {}).get("transfer_number", ""),
     }
 

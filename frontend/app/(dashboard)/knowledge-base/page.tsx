@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Plus, Search, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
+import { Modal } from "@/components/shared/Modal";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { api } from "@/lib/api";
@@ -209,88 +210,85 @@ function AddKnowledgeModal({
   isPending: boolean;
 }) {
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg glass-card p-6">
-        <h3 className="text-xl font-semibold text-white mb-4">
-          Add Knowledge
-        </h3>
-        <div className="flex gap-2 border-b border-white/10 mb-4">
-          <button
-            type="button"
-            className="px-4 py-2 text-sm font-medium text-[#4DFFCE] border-b-2 border-[#4DFFCE] -mb-px"
-          >
-            Text
-          </button>
-          <button
-            type="button"
-            disabled
-            className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
-          >
-            URL
-          </button>
-          <button
-            type="button"
-            disabled
-            className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
-          >
-            PDF
-          </button>
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="Add Knowledge"
+      subtitle="Text, URL, and PDF (more sources coming soon)"
+      size="lg"
+      scrollable
+    >
+      <div className="flex gap-2 border-b border-white/10 pb-4 mb-4">
+        <button
+          type="button"
+          className="px-4 py-2 text-sm font-medium text-[#4DFFCE] border-b-2 border-[#4DFFCE] -mb-px"
+        >
+          Text
+        </button>
+        <button
+          type="button"
+          disabled
+          className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
+        >
+          URL
+        </button>
+        <button
+          type="button"
+          disabled
+          className="px-4 py-2 text-sm font-medium text-white/70 cursor-not-allowed opacity-60"
+        >
+          PDF
+        </button>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <label className="form-label">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Product FAQ, Company Info"
+            className="form-input"
+          />
         </div>
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Product FAQ, Company Info"
-              className="form-input"
-            />
-          </div>
-          <div>
-            <label className="form-label">Content</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste text directly..."
-              rows={6}
-              className="form-input resize-none"
-            />
-          </div>
-          <div>
-            <label className="form-label">Assign to agent (optional)</label>
-            <select
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="form-input"
-            >
-              <option value="">No agent</option>
-              {agents.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="form-label">Content</label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Paste text directly..."
+            rows={6}
+            className="form-input resize-none"
+          />
         </div>
-        <div className="flex gap-3 mt-6">
-          <button type="button" onClick={onClose} className="btn-secondary flex-1">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={!name.trim() || !content.trim() || isPending}
-            className="btn-primary flex-1"
+        <div>
+          <label className="form-label">Assign to agent (optional)</label>
+          <select
+            value={agentId}
+            onChange={(e) => setAgentId(e.target.value)}
+            className="form-input"
           >
-            {isPending ? "Adding..." : "Add"}
-          </button>
+            <option value="">No agent</option>
+            {agents.map((a: any) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-    </>
+      <div className="flex gap-3 mt-6">
+        <button type="button" onClick={onClose} className="btn-secondary flex-1">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!name.trim() || !content.trim() || isPending}
+          className="btn-primary flex-1"
+        >
+          {isPending ? "Adding..." : "Add"}
+        </button>
+      </div>
+    </Modal>
   );
 }

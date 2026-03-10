@@ -515,6 +515,8 @@ export function TestCallPanel({
     )
   }
 
+  const overlayZ = 9997
+  const panelZ = 9998
   const overlay = (
     <>
       <div
@@ -523,20 +525,22 @@ export function TestCallPanel({
         onClick={onClose}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
         className={cn(
-          "fixed inset-0 z-40 transition-opacity duration-300 ease-out",
-          "bg-black/40 backdrop-blur-[4px]",
+          "fixed inset-0 transition-opacity duration-300 ease-out",
+          "bg-black/60 backdrop-blur-md",
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
+        style={{ zIndex: overlayZ }}
         aria-label="Close test call panel"
       />
       <div
         className={cn(
-          "fixed top-0 right-0 bottom-0 z-50 flex flex-col",
+          "fixed top-0 right-0 bottom-0 flex flex-col",
           "w-full max-w-[420px] min-w-0 h-screen min-h-screen",
           "bg-[#0B0D10] border-l border-white/10 shadow-[-8px_0_32px_rgba(0,0,0,0.5)]",
           "transition-[transform,opacity] duration-350 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform",
           open && !isEntering ? "translate-x-0 opacity-100" : "translate-x-full opacity-95"
         )}
+        style={{ zIndex: panelZ }}
       >
         {panelContent}
       </div>

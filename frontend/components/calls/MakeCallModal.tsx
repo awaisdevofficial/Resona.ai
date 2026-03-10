@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
-import { Phone, X } from "lucide-react";
+import { Phone } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
+import { Modal } from "@/components/shared/Modal";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 
@@ -111,38 +111,14 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
   const hasNoNumbers = !(phoneNumbers as any[])?.length;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4"
-          >
-            <div
-              className="glass-card border-white/10 max-w-md w-full pointer-events-auto p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white">Make a Call</h2>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-4">
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Make a Call"
+      subtitle={useTelephony ? "Call from your connected number" : hasNoNumbers ? "Connect your phone to get started" : "Choose an agent and number"}
+      size="md"
+    >
+      <div className="space-y-4">
                 {useTelephony ? (
                   <>
                     <p className="text-sm text-white/70">
@@ -280,10 +256,6 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
                   </>
                 )}
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }
