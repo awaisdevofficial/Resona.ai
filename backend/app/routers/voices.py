@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List
 
 import httpx
@@ -139,12 +140,14 @@ async def add_voice_clone(
     name = name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Voice name is required.")
-    # Ensure voice name is valid UTF-8 so ElevenLabs accepts the request
+    # Ensure voice name is valid UTF-8; restrict to printable ASCII to avoid ElevenLabs invalid_unicode errors
     try:
-        name = name.encode("utf-8", errors="replace").decode("utf-8")
+        name_clean = name.encode("utf-8", errors="replace").decode("utf-8").strip() or "Voice"
+        name_clean = re.sub(r"[^\x20-\x7e]", "", name_clean).strip() or "Voice"
     except Exception:
-        name = "Voice"
-    # Build multipart for ElevenLabs: name + files (use ASCII filenames to avoid invalid UTF-8 in headers)
+        name_clean = "Voice"
+    name_bytes = name_clean.encode("utf-8")
+    # Build multipart for ElevenLabs: name (explicit UTF-8) + files (ASCII filenames only)
     file_contents = []
     for i, f in enumerate(files):
         content = await f.read()
@@ -163,7 +166,8 @@ async def add_voice_clone(
     for api_key in keys:
         try:
             async with httpx.AsyncClient(timeout=60) as client:
-                parts = [("name", (None, name))]
+                # Send name as UTF-8 bytes with explicit charset so multipart is valid
+                parts = [("name", (None, name_bytes, "text/plain; charset=utf-8"))]
                 for filename, content, ctype in file_contents:
                     parts.append(("files", (filename, content, ctype)))
                 resp = await client.post(
@@ -175,8 +179,8 @@ async def add_voice_clone(
                 data = resp.json()
                 voice_id = data.get("voice_id") or data.get("id")
                 if voice_id:
-                    return {"voice_id": voice_id, "name": name, "message": "Voice clone created. It will appear in the library."}
-                return {"voice_id": None, "name": name, "message": "Voice clone created."}
+                    return {"voice_id": voice_id, "name": name_clean, "message": "Voice clone created. It will appear in the library."}
+                return {"voice_id": None, "name": name_clean, "message": "Voice clone created."}
             last_err = HTTPException(
                 status_code=min(resp.status_code, 502),
                 detail=resp.text[:300] if resp.text else "ElevenLabs failed to create voice.",
