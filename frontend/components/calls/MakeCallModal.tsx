@@ -10,12 +10,6 @@ import { Modal } from "@/components/shared/Modal";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 
-interface TelephonyStatus {
-  is_connected: boolean;
-  phone_number: string | null;
-  is_active: boolean;
-}
-
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -26,67 +20,23 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
   const [toNumber, setToNumber] = useState("");
   const [agentId, setAgentId] = useState("");
 
-  const { data: telephonyStatus, isLoading: telephonyLoading } = useQuery<TelephonyStatus>({
-    queryKey: ["telephony-status"],
-    queryFn: () => api.get("/v1/telephony/status"),
-    enabled: isOpen,
-  });
-
-  const { data: agents } = useQuery({
+  const { data: agents = [] } = useQuery({
     queryKey: ["agents"],
     queryFn: () => api.get("/v1/agents"),
     enabled: isOpen,
   });
 
-  const { data: phoneNumbers, isLoading: phoneNumbersLoading } = useQuery({
+  const { data: phoneNumbers = [] } = useQuery({
     queryKey: ["phone-numbers"],
     queryFn: () => api.get("/v1/phone-numbers"),
     enabled: isOpen,
   });
 
-  const importNumbers = useMutation({
-    mutationFn: () => api.post("/v1/phone-numbers/import", {}),
-    onSuccess: (data: any) => {
-      toast.success(
-        `Imported ${data.imported} number${data.imported !== 1 ? "s" : ""}. You can start a call now.`
-      );
-      qc.invalidateQueries({ queryKey: ["phone-numbers"] });
-    },
-    onError: () =>
-      toast.error(
-        "Failed to import. Connect phone account in Settings first."
-      ),
-  });
-
-  const makeTelephonyCall = useMutation({
-    mutationFn: () =>
-      api.post("/v1/telephony/call", {
-        to_phone_number: toNumber.trim(),
-      }),
-    onSuccess: () => {
-      toast.success(`Call initiated to ${toNumber}`);
-      qc.invalidateQueries({ queryKey: ["calls"] });
-      setToNumber("");
-      onClose();
-    },
-    onError: (err: any) => {
-      const msg =
-        err?.response?.data?.detail ??
-        (typeof err?.response?.data === "string" ? err.response.data : null) ??
-        err?.message ??
-        "Failed to start call";
-      toast.error(Array.isArray(msg) ? msg[0] : msg);
-    },
-  });
-
   const makeOutboundCall = useMutation({
-    mutationFn: () =>
-      api.post("/v1/calls/outbound", {
-        agent_id: agentId,
-        to_number: toNumber.trim(),
-      }),
-    onSuccess: () => {
-      toast.success(`Call initiated to ${toNumber}`);
+    mutationFn: (payload: { agent_id: string; to_number: string }) =>
+      api.post("/v1/calls/outbound", payload),
+    onSuccess: (_, variables) => {
+      toast.success(`Call initiated to ${variables.to_number}`);
       qc.invalidateQueries({ queryKey: ["calls"] });
       setToNumber("");
       setAgentId("");
@@ -94,181 +44,140 @@ export function MakeCallModal({ isOpen, onClose }: Props) {
     },
     onError: (err: any) => {
       const msg =
-        err?.response?.data?.detail ??
-        (typeof err?.response?.data === "string" ? err.response.data : null) ??
         err?.message ??
-        "Failed to start call";
-      toast.error(Array.isArray(msg) ? msg[0] : msg);
+        (typeof err?.response?.data?.detail === "string"
+          ? err.response?.data?.detail
+          : "Failed to start call");
+      toast.error(msg);
     },
   });
 
-  const useTelephony = Boolean(
-    telephonyStatus?.is_connected && telephonyStatus?.is_active
-  );
-  const fromNumber = agentId
-    ? (phoneNumbers as any[])?.find((n: any) => n.agent_id === agentId)
-    : null;
+  const agentsList = (agents as any[]) ?? [];
   const numbersList = (phoneNumbers as any[]) ?? [];
-  const hasNoNumbers = numbersList.length === 0;
-  const stillLoading = telephonyLoading || phoneNumbersLoading;
-  const showConnectPrompt = !stillLoading && !useTelephony && hasNoNumbers;
+  const fromNumber = agentId
+    ? numbersList.find((n: any) => n.agent_id === agentId)
+    : null;
+
+  const handleStartCall = () => {
+    const num = toNumber.trim();
+    if (!num) {
+      toast.error("Enter a phone number to call");
+      return;
+    }
+    if (!agentId) {
+      toast.error("Select an agent");
+      return;
+    }
+    if (!fromNumber) {
+      toast.error(
+        "This agent has no phone number. Assign one in Settings → Integrations."
+      );
+      return;
+    }
+    makeOutboundCall.mutate({ agent_id: agentId, to_number: num });
+  };
 
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
       title="Make a Call"
-      subtitle={
-        stillLoading
-          ? "Loading…"
-          : useTelephony
-            ? "Call from your connected number"
-            : showConnectPrompt
-              ? "Connect your phone to get started"
-              : "Choose an agent and number"
-      }
+      subtitle="Choose an agent and enter the number to call"
       size="md"
     >
       <div className="space-y-4">
-                {stillLoading ? (
-                  <p className="text-sm text-white/70 py-4">Checking your phone setup…</p>
-                ) : useTelephony ? (
-                  <>
-                    <p className="text-sm text-white/70">
-                      Call from your connected number{" "}
-                      <span className="font-mono font-medium text-white">
-                        {telephonyStatus?.phone_number ?? ""}
-                      </span>
-                    </p>
-                    <div>
-                      <label className="form-label">Phone number to call</label>
-                      <input
-                        value={toNumber}
-                        onChange={(e) => setToNumber(e.target.value)}
-                        placeholder="+12025551234"
-                        className="form-input font-mono"
-                      />
-                      <p className="text-xs text-white/65 mt-1">
-                        E.164 format with country code
-                      </p>
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        variant="primary"
-                        className="flex-1"
-                        onClick={() => makeTelephonyCall.mutate()}
-                        disabled={
-                          !toNumber.trim() || makeTelephonyCall.isPending
-                        }
-                      >
-                        <Phone size={16} />
-                        {makeTelephonyCall.isPending ? "Calling…" : "Start Call"}
-                      </Button>
-                      <Button variant="secondary" onClick={onClose} className="flex-1">
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
-                ) : showConnectPrompt ? (
-                  <>
-                    <p className="text-sm text-white/70">
-                      Connect your phone account and number in Settings to
-                      make and receive calls. Resona will set up everything
-                      automatically.
-                    </p>
-                    <div className="flex flex-col gap-2 pt-4">
-                      <Link href="/settings" onClick={onClose}>
-                        <Button variant="primary" className="w-full">
-                          Connect in Settings
-                        </Button>
-                      </Link>
-                      <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
+        {agentsList.length === 0 ? (
+          <p className="text-sm text-white/70 py-2">
+            Create an agent first in{" "}
+            <Link href="/agents/new" className="text-[#4DFFCE] hover:underline">
+              Agents
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            <div>
+              <label className="form-label">Agent</label>
+              <select
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+                className="form-input w-full"
+              >
+                <option value="">Select an agent...</option>
+                {agentsList.map((agent: any) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {agentId && (
+              <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                {fromNumber ? (
+                  <p className="text-sm text-white/70">
+                    Calling from{" "}
+                    <span className="font-mono font-medium text-white">
+                      {fromNumber.number}
+                    </span>
+                  </p>
                 ) : (
-                  <>
-                    <div>
-                      <label className="form-label">Agent</label>
-                      <select
-                        value={agentId}
-                        onChange={(e) => setAgentId(e.target.value)}
-                        className="form-input"
-                      >
-                        <option value="">Select an agent...</option>
-                        {agents?.map((agent: any) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {agentId && (
-                      <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-                        {fromNumber ? (
-                          <p className="text-sm text-white/70">
-                            Calling from{" "}
-                            <span className="font-mono font-medium text-white">
-                              {fromNumber.number}
-                            </span>
-                          </p>
-                        ) : (
-                          <p className="text-sm text-amber-400">
-                            This agent has no number assigned. Assign one in{" "}
-                            <Link href="/settings" className="underline font-medium text-[#4DFFCE]">
-                              Settings → Integrations
-                            </Link>
-                            .
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="form-label">Phone number to call</label>
-                      <input
-                        value={toNumber}
-                        onChange={(e) => setToNumber(e.target.value)}
-                        placeholder="+12025551234"
-                        className="form-input font-mono"
-                      />
-                      <p className="text-xs text-white/65 mt-1">
-                        Include country code. Example: +12025551234
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        variant="primary"
-                        className="flex-1"
-                        onClick={() => {
-                          if (!fromNumber) {
-                            toast.error(
-                              "Assign a number to this agent in Settings → Integrations first."
-                            );
-                            return;
-                          }
-                          makeOutboundCall.mutate();
-                        }}
-                        disabled={
-                          !toNumber.trim() ||
-                          !agentId ||
-                          !fromNumber ||
-                          makeOutboundCall.isPending
-                        }
-                      >
-                        <Phone size={16} />
-                        {makeOutboundCall.isPending ? "Calling…" : "Start Call"}
-                      </Button>
-                      <Button variant="secondary" onClick={onClose} className="flex-1">
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
+                  <p className="text-sm text-amber-400">
+                    No number assigned to this agent.{" "}
+                    <Link
+                      href="/settings"
+                      className="underline font-medium text-[#4DFFCE]"
+                    >
+                      Settings → Integrations
+                    </Link>{" "}
+                    to add or assign a number.
+                  </p>
                 )}
               </div>
+            )}
+
+            <div>
+              <label className="form-label">Number to call</label>
+              <input
+                value={toNumber}
+                onChange={(e) => setToNumber(e.target.value)}
+                placeholder="+12025551234"
+                className="form-input w-full font-mono"
+              />
+              <p className="text-xs text-white/65 mt-1">
+                Include country code (e.g. +233...)
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handleStartCall}
+                disabled={
+                  !toNumber.trim() ||
+                  !agentId ||
+                  !fromNumber ||
+                  makeOutboundCall.isPending
+                }
+              >
+                <Phone size={16} />
+                {makeOutboundCall.isPending ? "Calling…" : "Start Call"}
+              </Button>
+              <Button variant="secondary" onClick={onClose} className="flex-1">
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
+
+        <p className="text-xs text-white/50 pt-2 border-t border-white/10">
+          Need to connect a phone account?{" "}
+          <Link href="/settings" className="text-[#4DFFCE]/80 hover:underline">
+            Settings → Integrations
+          </Link>
+        </p>
+      </div>
     </Modal>
   );
 }
