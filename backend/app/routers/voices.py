@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config import settings
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, SUPPORTED_LANGUAGES
 from app.system_settings import get_cartesia_keys_ordered, get_elevenlabs_keys_ordered
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ router = APIRouter()
 
 ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1"
 CARTESIA_API_BASE = "https://api.cartesia.ai"
-CARTESIA_API_VERSION = "2024-06-10"
+CARTESIA_API_VERSION = "2025-04-16"
 
 # In-memory cache for voices list to avoid hitting providers on every request
 _voices_cache: list | None = None
@@ -82,8 +82,22 @@ def _cartesia_headers(api_key: str) -> dict:
     }
 
 
+# Cartesia Sonic-3 supported languages: code -> display name (for voice list and agent language selector)
+CARTESIA_LANGUAGE_DISPLAY = {
+    "en": "English", "ar": "Arabic", "bn": "Bengali", "bg": "Bulgarian", "zh": "Chinese",
+    "hr": "Croatian", "cs": "Czech", "da": "Danish", "nl": "Dutch", "fi": "Finnish",
+    "fr": "French", "ka": "Georgian", "de": "German", "el": "Greek", "gu": "Gujarati",
+    "he": "Hebrew", "hi": "Hindi", "hu": "Hungarian", "id": "Indonesian", "it": "Italian",
+    "ja": "Japanese", "kn": "Kannada", "ko": "Korean", "ml": "Malayalam", "ms": "Malay",
+    "mr": "Marathi", "no": "Norwegian", "pa": "Punjabi", "pl": "Polish", "pt": "Portuguese",
+    "ro": "Romanian", "ru": "Russian", "sk": "Slovak", "es": "Spanish", "sv": "Swedish",
+    "tl": "Tagalog", "ta": "Tamil", "te": "Telugu", "th": "Thai", "tr": "Turkish",
+    "uk": "Ukrainian", "vi": "Vietnamese",
+}
+
+
 def _enrich_cartesia_voice(raw: dict) -> dict:
-    """Map Cartesia voice object to our Voice schema. Cartesia uses UUID id."""
+    """Map Cartesia voice object to our Voice schema. Cartesia uses UUID id; API returns language per voice."""
     voice_id = (raw.get("id") or "").strip()
     name = (raw.get("name") or raw.get("description") or "Unknown").strip() or "Unknown"
     gender_raw = (raw.get("gender") or raw.get("gender_presentation") or "neutral").lower()
@@ -94,6 +108,8 @@ def _enrich_cartesia_voice(raw: dict) -> dict:
     else:
         gender = "neutral"
     description = raw.get("description") or name
+    lang_code = (raw.get("language") or "en").strip() if raw.get("language") else "en"
+    lang_display = CARTESIA_LANGUAGE_DISPLAY.get(lang_code, lang_code)
     return {
         "id": voice_id,
         "name": name,
@@ -101,8 +117,8 @@ def _enrich_cartesia_voice(raw: dict) -> dict:
         "gender": gender,
         "description": description,
         "preview_url": raw.get("preview_url"),
-        "language": "English",
-        "language_code": "en",
+        "language": lang_display,
+        "language_code": lang_code,
         "quality": None,
         "is_custom": False,
     }
@@ -205,6 +221,12 @@ async def _fetch_elevenlabs_voices() -> list[Voice]:
     if last_err:
         logger.warning("ElevenLabs voices fetch failed for all keys: %s", last_err)
     return []
+
+
+@router.get("/languages")
+async def list_supported_languages(user: User = Depends(get_current_user)):  # noqa: ARG001
+    """Return supported STT/TTS language codes and display names (e.g. for agent language selector)."""
+    return [{"code": code, "name": name} for code, name in SUPPORTED_LANGUAGES]
 
 
 @router.get("", response_model=List[Voice])
@@ -323,7 +345,7 @@ async def preview_voice(body: VoicePreviewRequest, user: User = Depends(get_curr
                         f"{CARTESIA_API_BASE}/tts/bytes",
                         headers=_cartesia_headers(api_key),
                         json={
-                            "model_id": "sonic-2",
+                            "model_id": "sonic-3",
                             "transcript": text,
                             "voice": {"mode": "id", "id": voice_id},
                             "output_format": {"container": "wav", "encoding": "pcm_s16le", "sample_rate": 44100},

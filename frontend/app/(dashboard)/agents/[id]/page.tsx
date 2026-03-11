@@ -26,33 +26,20 @@ const FIXED_DEFAULTS = {
   tts_stability: 0.45,
 }
 
-const LANGUAGE_OPTIONS = [
+// Fallback if /v1/voices/languages is unavailable
+const LANGUAGE_OPTIONS_FALLBACK = [
   { value: "en", label: "English" },
-  { value: "en-US", label: "English (US)" },
-  { value: "en-GB", label: "English (UK)" },
-  { value: "es-ES", label: "Spanish (Spain)" },
-  { value: "es-US", label: "Spanish (US)" },
-  { value: "es-MX", label: "Spanish (Mexico)" },
-  { value: "fr-FR", label: "French (France)" },
-  { value: "fr-CA", label: "French (Canada)" },
-  { value: "de-DE", label: "German" },
-  { value: "it-IT", label: "Italian" },
-  { value: "pt-BR", label: "Portuguese (Brazil)" },
-  { value: "pt-PT", label: "Portuguese (Portugal)" },
-  { value: "nl-NL", label: "Dutch" },
-  { value: "pl-PL", label: "Polish" },
-  { value: "ru-RU", label: "Russian" },
-  { value: "ja-JP", label: "Japanese" },
-  { value: "ko-KR", label: "Korean" },
-  { value: "zh-CN", label: "Chinese (Simplified)" },
-  { value: "zh-TW", label: "Chinese (Traditional)" },
-  { value: "hi-IN", label: "Hindi" },
-  { value: "ar-SA", label: "Arabic (Saudi Arabia)" },
-  { value: "tr-TR", label: "Turkish" },
-  { value: "sv-SE", label: "Swedish" },
-  { value: "da-DK", label: "Danish" },
-  { value: "fi-FI", label: "Finnish" },
-  { value: "no-NO", label: "Norwegian" },
+  { value: "ar", label: "Arabic" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "it", label: "Italian" },
+  { value: "pt", label: "Portuguese" },
+  { value: "ja", label: "Japanese" },
+  { value: "ko", label: "Korean" },
+  { value: "zh", label: "Chinese" },
+  { value: "hi", label: "Hindi" },
+  { value: "tr", label: "Turkish" },
 ]
 
 interface AgentFormValues {
@@ -103,7 +90,7 @@ export default function AgentEditPage({
       first_message: "",
       tts_voice_id: "",
       tts_provider: "cartesia",
-      stt_language: "en-US",
+      stt_language: "en",
       silence_timeout: 30,
       max_duration: 3600,
       agent_speaks_first: true,
@@ -120,7 +107,7 @@ export default function AgentEditPage({
         first_message: agent.first_message || "",
         tts_voice_id: agent.tts_voice_id || "",
         tts_provider: agent.tts_provider ?? "cartesia",
-        stt_language: agent.stt_language || "en-US",
+        stt_language: (agent.stt_language || "en").replace(/-[A-Za-z]+$/, "") || "en",
         silence_timeout: agent.silence_timeout || 30,
         max_duration: agent.max_duration || 3600,
         agent_speaks_first: agent.tools_config?.agent_speaks_first ?? true,
@@ -139,6 +126,18 @@ export default function AgentEditPage({
       }))
     )
   }, [agent?.id, phoneNumbers])
+
+  const { data: languagesData = [] } = useQuery({
+    queryKey: ["voices", "languages"],
+    queryFn: () => api.get("/v1/voices/languages") as Promise<{ code: string; name: string }[]>,
+    staleTime: 60_000 * 5,
+  })
+  const languageOptions = useMemo(() => {
+    const list = Array.isArray(languagesData) && languagesData.length > 0
+      ? languagesData.map(({ code, name }) => ({ value: code, label: name }))
+      : LANGUAGE_OPTIONS_FALLBACK
+    return list
+  }, [languagesData])
 
   const watchedName = form.watch("name")
   const watchedFirstMessage = form.watch("first_message")
@@ -571,7 +570,7 @@ export default function AgentEditPage({
                         <DarkSelect
                           value={field.value}
                           onChange={field.onChange}
-                          options={LANGUAGE_OPTIONS}
+                          options={languageOptions}
                           aria-label="Language"
                         />
                       )}

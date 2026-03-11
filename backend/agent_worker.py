@@ -90,11 +90,12 @@ async def entrypoint(ctx: JobContext):
     has_dg = bool((app_settings.DEEPGRAM_API_KEY or "").strip())
     has_groq = bool((app_settings.GROQ_API_KEY or "").strip())
     has_cart = bool((app_settings.CARTESIA_API_KEY or "").strip())
-    logger.info("API keys present: DEEPGRAM=%s GROQ=%s CARTESIA=%s", has_dg, has_groq, has_cart)
+    use_modal_llm = bool((os.environ.get("MODAL_LLM_BASE_URL") or "").strip())
+    logger.info("API keys present: DEEPGRAM=%s GROQ=%s CARTESIA=%s MODAL_LLM=%s", has_dg, has_groq, has_cart, use_modal_llm)
     if not has_dg:
         logger.error("DEEPGRAM_API_KEY missing. Set it in api-keys table (Supabase) and ensure DATABASE_URL is set for the worker.")
-    if not has_groq:
-        logger.error("GROQ_API_KEY missing. Set it in api-keys table (Supabase).")
+    if not use_modal_llm and not has_groq:
+        logger.error("GROQ_API_KEY missing. Set it in api-keys table (Supabase), or set MODAL_LLM_BASE_URL for Modal.")
     if not has_cart:
         logger.error("CARTESIA_API_KEY missing. Set it in api-keys table (Supabase).")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -142,9 +143,9 @@ async def entrypoint(ctx: JobContext):
                 "system_prompt": "You are a helpful, friendly voice assistant. Keep replies short and natural.",
                 "first_message": "Hey, hi! What can I do for you?",
                 "tts_voice_id": (app_settings.CARTESIA_DEFAULT_VOICE_ID or "a0e99841-438c-4a64-b679-ae501e7d6091").strip(),
-                "llm_model": "llama-3.3-70b-versatile",
-                "llm_temperature": 0.8,
-                "llm_max_tokens": 150,
+                "llm_model": "Llama-3.1-8B-Instant",
+                "llm_temperature": 0.5,
+                "llm_max_tokens": 120,
             }
 
     # User's system prompt is primary; we only wrap it with real-time + human-behavior instructions
@@ -211,58 +212,87 @@ async def entrypoint(ctx: JobContext):
         api_key=deepgram_key,
         model="nova-2",
         language=stt_language or "en",
-        smart_format=True,
+        smart_format=False,
         interim_results=True,
-        endpointing_ms=200,
+        endpointing_ms=120,
     )
-    logger.info("STT: Deepgram (nova-2, language=%s, smart_format=True, endpointing_ms=200)", stt_language or "en")
+    logger.info("STT: Deepgram (nova-2, language=%s, smart_format=False, endpointing_ms=120)", stt_language or "en")
 
-    # LLM — Groq (OpenAI-compatible)
+    # LLM — Modal (Llama-3.1-8B-Instant) or Groq (OpenAI-compatible)
     from livekit.plugins import openai as openai_plugin
 
-    groq_key = (app_settings.GROQ_API_KEY or "").strip()
-    if not groq_key:
-        raise RuntimeError("GROQ_API_KEY is required for the LLM. Set it in DB (api-keys) or environment.")
+    modal_base_url = (os.environ.get("MODAL_LLM_BASE_URL") or "").strip().rstrip("/")
+    use_modal = bool(modal_base_url)
 
-    _raw_llm_model = (agent_config.get("llm_model") or "llama-3.3-70b-versatile").strip()
-    # Groq API does not have OpenAI models (gpt-4o, etc.). Use Groq model when calling Groq.
-    GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
-    if _raw_llm_model.startswith("gpt-") or _raw_llm_model.startswith("o1-"):
-        llm_model = GROQ_DEFAULT_MODEL
-        logger.info("LLM: agent model %s is not a Groq model, using %s", _raw_llm_model, llm_model)
+    if use_modal:
+        # Modal OpenAI-compatible endpoint (e.g. vLLM on Modal serving Llama-3.1-8B-Instant)
+        _raw_llm_model = (agent_config.get("llm_model") or "Llama-3.1-8B-Instant").strip()
+        llm_model = _raw_llm_model or "Llama-3.1-8B-Instant"
+        llm_temperature = max(0.5, min(1.0, float(agent_config.get("llm_temperature", 0.8))))
+        llm_max_tokens = max(1, min(150, int(agent_config.get("llm_max_tokens", 150))))
+        modal_api_key = (os.environ.get("MODAL_API_KEY") or "not-needed").strip()
+        llm_kw = {
+            "model": llm_model,
+            "api_key": modal_api_key,
+            "base_url": modal_base_url,
+            "temperature": llm_temperature,
+            "max_completion_tokens": llm_max_tokens,
+        }
+        try:
+            timeout_sec = float(os.environ.get("OPENAI_TIMEOUT", "30"))
+            if timeout_sec > 0:
+                llm_kw["timeout"] = httpx.Timeout(timeout_sec)
+        except (TypeError, ValueError):
+            pass
+        llm = openai_plugin.LLM(**llm_kw)
+        logger.info("LLM: Modal Llama-3.1-8B-Instant (%s, temp=%.2f, max_tokens=%d)", llm_model, llm_temperature, llm_max_tokens)
     else:
-        llm_model = _raw_llm_model or GROQ_DEFAULT_MODEL
+        groq_key = (app_settings.GROQ_API_KEY or "").strip()
+        if not groq_key:
+            raise RuntimeError("GROQ_API_KEY is required for the LLM when not using Modal. Set it in DB (api-keys) or set MODAL_LLM_BASE_URL for Modal.")
 
-    llm_temperature = float(agent_config.get("llm_temperature", 0.8))
-    llm_max_tokens = int(agent_config.get("llm_max_tokens", 150))
-    llm_temperature = max(0.5, min(1.0, llm_temperature))
-    llm_max_tokens = max(1, min(150, llm_max_tokens))
+        _raw_llm_model = (agent_config.get("llm_model") or "llama-3.1-8b-instant").strip()
+        GROQ_DEFAULT_MODEL = "llama-3.1-8b-instant"
+        if _raw_llm_model.startswith("gpt-") or _raw_llm_model.startswith("o1-"):
+            llm_model = GROQ_DEFAULT_MODEL
+            logger.info("LLM: agent model %s is not a Groq model, using %s", _raw_llm_model, llm_model)
+        else:
+            llm_model = _raw_llm_model or GROQ_DEFAULT_MODEL
 
-    llm_kw: dict = {
-        "model": llm_model,
-        "api_key": groq_key,
-        "base_url": "https://api.groq.com/openai/v1",
-        "temperature": llm_temperature,
-        "max_completion_tokens": llm_max_tokens,
-    }
-    try:
-        timeout_sec = float(os.environ.get("OPENAI_TIMEOUT", "30"))
-        if timeout_sec > 0:
-            llm_kw["timeout"] = httpx.Timeout(timeout_sec)
-    except (TypeError, ValueError):
-        pass
-    llm = openai_plugin.LLM(**llm_kw)
-    logger.info("LLM: Groq (%s, temp=%.2f, max_tokens=%d)", llm_model, llm_temperature, llm_max_tokens)
+        llm_temperature = float(agent_config.get("llm_temperature", 0.8))
+        llm_max_tokens = int(agent_config.get("llm_max_tokens", 150))
+        llm_temperature = max(0.5, min(1.0, llm_temperature))
+        llm_max_tokens = max(1, min(150, llm_max_tokens))
 
-    # TTS — Cartesia Sonic
+        llm_kw = {
+            "model": llm_model,
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "temperature": llm_temperature,
+            "max_completion_tokens": llm_max_tokens,
+        }
+        try:
+            timeout_sec = float(os.environ.get("OPENAI_TIMEOUT", "30"))
+            if timeout_sec > 0:
+                llm_kw["timeout"] = httpx.Timeout(timeout_sec)
+        except (TypeError, ValueError):
+            pass
+        llm = openai_plugin.LLM(**llm_kw)
+        logger.info("LLM: Groq (%s, temp=%.2f, max_tokens=%d)", llm_model, llm_temperature, llm_max_tokens)
+
+    # TTS — Cartesia Sonic-3 (streaming; language from agent for Arabic, etc.)
     cartesia_key = (app_settings.CARTESIA_API_KEY or "").strip()
     if not cartesia_key:
         raise RuntimeError("CARTESIA_API_KEY is not configured. Cannot start agent worker.")
 
     from livekit.plugins import cartesia as cartesia_plugin
 
-    # Cartesia expects UUID-format voice IDs (e.g. a0e99841-438c-4a64-b679-ae501e7d6091).
-    # If agent has an ElevenLabs-style voice ID (e.g. XrExE9yKIg1WjnnlVkGX), use Cartesia default.
+    # Dynamic language: agent's stt_language (or tts_language if set) so user can select e.g. Arabic.
+    # Normalize locale codes (en-US, ar-SA) to short code (en, ar) for Cartesia Sonic-3.
+    _lang_raw = (agent_config.get("tts_language") or agent_config.get("stt_language") or "en").strip() or "en"
+    tts_language = _lang_raw.split("-")[0] if _lang_raw else "en"
+
+    # Cartesia expects UUID-format voice IDs. If agent has non-UUID (e.g. ElevenLabs), use default.
     _raw_voice = (agent_config.get("tts_voice_id") or "").strip()
     _cartesia_default = (app_settings.CARTESIA_DEFAULT_VOICE_ID or "").strip() or "a0e99841-438c-4a64-b679-ae501e7d6091"
     if _raw_voice and "-" in _raw_voice and len(_raw_voice) == 36:
@@ -273,11 +303,11 @@ async def entrypoint(ctx: JobContext):
             logger.info("TTS: agent tts_voice_id is not a Cartesia UUID, using default voice=%s", tts_voice_id)
     tts = cartesia_plugin.TTS(
         api_key=cartesia_key,
-        model="sonic-2",
+        model="sonic-3",
         voice=tts_voice_id,
-        language="en",
+        language=tts_language,
     )
-    logger.info("TTS: Cartesia (sonic-2, voice=%s, language=en)", tts_voice_id)
+    logger.info("TTS: Cartesia (sonic-3, voice=%s, language=%s)", tts_voice_id, tts_language)
 
     # AgentSession — use TurnHandlingConfig if available, else standard kwargs
     _session_kw: dict = {

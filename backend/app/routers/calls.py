@@ -232,6 +232,7 @@ async def make_outbound_call(
             "system_prompt": full_system_prompt,
             "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip(),
             "stt_language": (agent.stt_language or "en").strip() or "en",
+            "tts_language": (getattr(agent, "tts_language", None) or agent.stt_language or "en").strip() or "en",
             "tts_voice_id": voice_id,
             "llm_model": (agent.llm_model or "llama-3.3-70b-versatile").strip(),
             "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,

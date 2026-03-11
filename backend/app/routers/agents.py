@@ -230,6 +230,7 @@ async def _create_web_call_token_impl(
         "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
         "llm_max_tokens": llm_max_tokens,
         "stt_language": (agent.stt_language or "en").strip() or "en",
+        "tts_language": (getattr(agent, "tts_language", None) or agent.stt_language or "en").strip() or "en",
         "tts_voice_id": voice_id,
         "silence_timeout": int(agent.silence_timeout or 30),
         "max_duration": int(agent.max_duration or 3600),
@@ -304,10 +305,12 @@ async def _create_web_call_token_impl(
             ),
         )
 
+    # Prefer public wss URL for browser clients when set (e.g. behind nginx); otherwise LIVEKIT_URL
+    livekit_url = (getattr(settings, "LIVEKIT_PUBLIC_WS_URL", None) or "").strip() or settings.LIVEKIT_URL
     return {
         "token": token,
         "room_name": room_name,
-        "livekit_url": settings.LIVEKIT_URL,
+        "livekit_url": livekit_url,
         "call_id": str(call_id),
     }
 

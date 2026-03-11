@@ -205,6 +205,19 @@ export function TestCallPanel({
         callIdRef.current = data.call_id
       }
 
+      // Use public WS URL in browser when backend returns internal (e.g. ws://localhost:7880)
+      const rawWs = (data.livekit_url || "").trim()
+      const isInternal =
+        !rawWs ||
+        /^\s*(ws|http):\/\/(localhost|127\.0\.0\.1|host\.docker\.internal)/i.test(rawWs) ||
+        (rawWs.startsWith("ws://") && !rawWs.includes("resonaai"))
+      const publicWs =
+        typeof process !== "undefined" && (process.env?.NEXT_PUBLIC_LIVEKIT_URL || "").trim()
+      const livekitUrl = isInternal && publicWs ? publicWs : rawWs
+      if (!livekitUrl) {
+        throw new Error("LiveKit URL not configured. Set LIVEKIT_URL on the server or NEXT_PUBLIC_LIVEKIT_URL for the app.")
+      }
+
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -273,7 +286,7 @@ export function TestCallPanel({
         cleanupRoom()
       })
 
-      await room.connect(data.livekit_url, data.token)
+      await room.connect(livekitUrl, data.token)
 
       const tracks = await createLocalTracks({ audio: true, video: false })
       for (const track of tracks) {

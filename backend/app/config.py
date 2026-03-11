@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # LiveKit
     LIVEKIT_URL: str
     LIVEKIT_API_URL: str = ""  # HTTP URL for LiveKit API (SIP/twirp). If empty or localhost, derived from LIVEKIT_URL.
+    # Optional: public wss URL for browser clients (e.g. wss://resonaai.duckdns.org/livekit). If set, returned by web-call-token.
+    LIVEKIT_PUBLIC_WS_URL: str = ""
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
     LIVEKIT_SIP_URI: str = ""
