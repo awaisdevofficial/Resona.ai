@@ -253,9 +253,15 @@ async def entrypoint(ctx: JobContext):
 
         _raw_llm_model = (agent_config.get("llm_model") or "llama-3.1-8b-instant").strip()
         GROQ_DEFAULT_MODEL = "llama-3.1-8b-instant"
-        if _raw_llm_model.startswith("gpt-") or _raw_llm_model.startswith("o1-"):
+        # Always use 8b-instant; never use 70b/versatile (quota and rate limits)
+        if (
+            _raw_llm_model.startswith("gpt-")
+            or _raw_llm_model.startswith("o1-")
+            or "70b" in _raw_llm_model.lower()
+            or "versatile" in _raw_llm_model.lower()
+        ):
             llm_model = GROQ_DEFAULT_MODEL
-            logger.info("LLM: agent model %s is not a Groq model, using %s", _raw_llm_model, llm_model)
+            logger.info("LLM: agent model %s -> using %s", _raw_llm_model, llm_model)
         else:
             llm_model = _raw_llm_model or GROQ_DEFAULT_MODEL
 

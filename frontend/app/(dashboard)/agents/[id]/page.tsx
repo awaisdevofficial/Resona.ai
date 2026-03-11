@@ -16,7 +16,7 @@ import { VoiceLibrary, Voice } from "@/components/agents/VoiceLibrary"
 import { DarkSelect } from "@/components/shared/DarkSelect"
 
 const FIXED_DEFAULTS = {
-  llm_model: "llama-3.3-70b-versatile",
+  llm_model: "llama-3.1-8b-instant",
   llm_temperature: 0.8,
   llm_max_tokens: 150,
   stt_provider: "deepgram",

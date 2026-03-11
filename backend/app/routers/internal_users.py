@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, groq_llm_model_for_agent
 from app.database import get_db
 from app.middleware.auth import verify_internal_secret
 from app.models.agent import Agent
@@ -109,7 +109,7 @@ async def get_default_agent_config(
         "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip(),
         "stt_language": (agent.stt_language or "en").strip() or "en",
         "tts_voice_id": tts_voice_id,
-        "llm_model": (agent.llm_model or "llama-3.3-70b-versatile").strip(),
+        "llm_model": groq_llm_model_for_agent(agent.llm_model),
         "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
         "llm_max_tokens": llm_max_tokens,
         "knowledge_base": knowledge_base,

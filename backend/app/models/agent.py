@@ -27,7 +27,7 @@ class Agent(Base):
     description = Column(Text, nullable=True)
     system_prompt = Column(Text, nullable=False)
     first_message = Column(String, nullable=True)
-    llm_model = Column(String, default="llama-3.3-70b-versatile")  # Groq; voice agent stack
+    llm_model = Column(String, default="llama-3.1-8b-instant")  # Groq; 8b uses less quota than 70b
     llm_temperature = Column(Float, default=0.8)  # Slight variety for less robotic tone
     llm_max_tokens = Column(Integer, default=150)  # Capped for real-time voice (Groq)
     stt_provider = Column(String, default="deepgram")

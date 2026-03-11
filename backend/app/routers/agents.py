@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.prompts import HUMAN_BEHAVIOR_PROMPT, get_full_system_prompt
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from app.config import settings
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, groq_llm_model_for_agent
 import httpx as _httpx
 
 from app.database import get_db
@@ -53,7 +53,9 @@ async def create_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    agent = Agent(id=uuid.uuid4(), user_id=user.id, **body.model_dump())
+    data = body.model_dump()
+    data["llm_model"] = groq_llm_model_for_agent(data.get("llm_model"))
+    agent = Agent(id=uuid.uuid4(), user_id=user.id, **data)
     db.add(agent)
     await db.commit()
     await db.refresh(agent)
@@ -108,6 +110,8 @@ async def update_agent(
     ]
     for field, value in body.items():
         if field in allowed_fields and hasattr(agent, field):
+            if field == "llm_model":
+                value = groq_llm_model_for_agent(value)
             setattr(agent, field, value)
 
     await db.commit()
@@ -144,7 +148,7 @@ async def duplicate_agent(
         description=agent.description,
         system_prompt=agent.system_prompt,
         first_message=agent.first_message,
-        llm_model=agent.llm_model,
+        llm_model=groq_llm_model_for_agent(agent.llm_model),
         llm_temperature=agent.llm_temperature,
         llm_max_tokens=agent.llm_max_tokens,
         stt_provider=agent.stt_provider,
@@ -226,7 +230,7 @@ async def _create_web_call_token_impl(
         "user_email": user.email,
         "system_prompt": full_system_prompt,
         "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip()[:2000],
-        "llm_model": (agent.llm_model or "llama-3.3-70b-versatile").strip(),
+        "llm_model": groq_llm_model_for_agent(agent.llm_model),
         "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
         "llm_max_tokens": llm_max_tokens,
         "stt_language": (agent.stt_language or "en").strip() or "en",

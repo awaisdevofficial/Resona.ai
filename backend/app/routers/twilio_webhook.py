@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.twiml.voice_response import Dial, VoiceResponse
 
 from app.config import settings
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, groq_llm_model_for_agent
 from app.database import get_db
 from app.prompts import get_full_system_prompt
 from app.models.agent import Agent
@@ -109,7 +109,7 @@ async def handle_inbound(request: Request, db: AsyncSession = Depends(get_db)):
         "first_message": (agent.first_message or "Hey, hi! What can I do for you?").strip(),
         "stt_language": (agent.stt_language or "en").strip() or "en",
         "tts_voice_id": tts_voice_id,
-        "llm_model": (agent.llm_model or "llama-3.3-70b-versatile").strip(),
+        "llm_model": groq_llm_model_for_agent(agent.llm_model),
         "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
         "llm_max_tokens": llm_max_tokens,
         "silence_timeout": int(agent.silence_timeout or 30),

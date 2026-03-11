@@ -26,7 +26,7 @@ class AgentCreate(BaseModel):
     description: Optional[str] = None
     system_prompt: str = Field(..., min_length=1, max_length=MAX_SYSTEM_PROMPT_LEN)
     first_message: str = Field(..., min_length=1, max_length=MAX_FIRST_MESSAGE_LEN)
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "llama-3.1-8b-instant"
     llm_temperature: float = Field(0.8, ge=0.0, le=1.0)
     llm_max_tokens: int = Field(150, ge=1, le=4000)  # Worker caps at 150 for real-time
     stt_provider: str = "deepgram"

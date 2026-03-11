@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.system_settings import get_openai_keys_ordered
-from app.constants import DEFAULT_CARTESIA_VOICE_ID
+from app.constants import DEFAULT_CARTESIA_VOICE_ID, groq_llm_model_for_agent
 from app.database import AsyncSessionLocal, get_db
 from app.prompts import get_full_system_prompt
 from app.middleware.auth import get_current_user, verify_internal_secret
@@ -234,7 +234,7 @@ async def make_outbound_call(
             "stt_language": (agent.stt_language or "en").strip() or "en",
             "tts_language": (getattr(agent, "tts_language", None) or agent.stt_language or "en").strip() or "en",
             "tts_voice_id": voice_id,
-            "llm_model": (agent.llm_model or "llama-3.3-70b-versatile").strip(),
+            "llm_model": groq_llm_model_for_agent(agent.llm_model),
             "llm_temperature": agent.llm_temperature if agent.llm_temperature is not None else 0.8,
             "llm_max_tokens": llm_max_tokens,
             "silence_timeout": int(agent.silence_timeout or 30),
